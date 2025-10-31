@@ -1,0 +1,41 @@
+{
+  "name": "notetaker",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "compile": "hardhat compile",
+    "deploy:sepolia": "hardhat run scripts/deploy.ts --network baseSepolia",
+    "deploy:base": "hardhat run scripts/deploy.ts --network base",
+    "verify": "hardhat verify --network baseSepolia",
+    "auto-commit": "node scripts/auto-commit.js"
+  },
+  "dependencies": {
+    "@reown/appkit": "^1.8.12",
+    "@reown/appkit-adapter-wagmi": "^1.8.12",
+    "@tanstack/react-query": "^5.90.5",
+    "nativewind": "^4.2.1",
+    "next": "16.0.1",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "viem": "^2.38.5",
+    "wagmi": "^2.19.1"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "chokidar": "^4.0.1",
+    "dotenv": "^17.2.3",
+    "eslint": "^9",
+    "eslint-config-next": "16.0.1",
+    "hardhat": "^3.0.10",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}
