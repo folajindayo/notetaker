@@ -7,16 +7,20 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "compile": "hardhat compile",
-    "deploy:sepolia": "hardhat run scripts/deploy.ts --network baseSepolia",
-    "deploy:base": "hardhat run scripts/deploy.ts --network base",
+    "compile": "NODE_OPTIONS='--loader ts-node/esm' hardhat compile",
+    "deploy:sepolia": "NODE_OPTIONS='--loader ts-node/esm' hardhat run scripts/deploy.ts --network baseSepolia",
+    "deploy:base": "NODE_OPTIONS='--loader ts-node/esm' hardhat run scripts/deploy.ts --network base",
     "verify": "hardhat verify --network baseSepolia",
     "auto-commit": "node scripts/auto-commit.js"
   },
   "dependencies": {
+    "@nomicfoundation/hardhat-ignition": "^3.0.3",
+    "@nomicfoundation/hardhat-ignition-ethers": "^3.0.3",
+    "@nomicfoundation/hardhat-verify": "^3.0.4",
     "@reown/appkit": "^1.8.12",
     "@reown/appkit-adapter-wagmi": "^1.8.12",
     "@tanstack/react-query": "^5.90.5",
+    "ethers": "^6.15.0",
     "nativewind": "^4.2.1",
     "next": "16.0.1",
     "react": "19.2.0",
@@ -25,7 +29,6 @@
     "wagmi": "^2.19.1"
   },
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^6.1.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

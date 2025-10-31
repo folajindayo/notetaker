@@ -1,8 +1,11 @@
-import { HardhatUserConfig } from "hardhat/config";
-import "@nomicfoundation/hardhat-toolbox";
-import "dotenv/config";
+import "@nomicfoundation/hardhat-ignition-ethers";
+import "@nomicfoundation/hardhat-ignition";
+import "@nomicfoundation/hardhat-verify";
+import dotenv from "dotenv";
 
-const config: HardhatUserConfig = {
+dotenv.config({ path: ".env.local" });
+
+export default {
   solidity: {
     version: "0.8.28",
     settings: {
@@ -10,17 +13,20 @@ const config: HardhatUserConfig = {
         enabled: true,
         runs: 200,
       },
+      evmVersion: "paris",
     },
   },
   networks: {
     baseSepolia: {
+      type: "http",
       url: process.env.BASE_SEPOLIA_RPC_URL || "https://sepolia.base.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY ? [(process.env.PRIVATE_KEY.startsWith('0x') ? process.env.PRIVATE_KEY : '0x' + process.env.PRIVATE_KEY)] : [],
       chainId: 84532,
     },
     base: {
+      type: "http",
       url: process.env.BASE_RPC_URL || "https://mainnet.base.org",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      accounts: process.env.PRIVATE_KEY ? [(process.env.PRIVATE_KEY.startsWith('0x') ? process.env.PRIVATE_KEY : '0x' + process.env.PRIVATE_KEY)] : [],
       chainId: 8453,
     },
   },
@@ -40,7 +46,7 @@ const config: HardhatUserConfig = {
       },
     ],
   },
+  sourcify: {
+    enabled: false
+  }
 };
-
-export default config;
-

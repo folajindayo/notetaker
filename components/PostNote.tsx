@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { CONTRACT_ADDRESS, CONTRACT_ABI, MAX_MESSAGE_LENGTH } from "@/lib/constants";
+import { WalletConnect } from "./WalletConnect";
 
 export function PostNote() {
   const [message, setMessage] = useState("");
@@ -34,58 +35,109 @@ export function PostNote() {
     setTimeout(() => setMessage(""), 1000);
   }
 
-  if (!isConnected) {
-    return (
-      <div className="bg-gray-50 dark:bg-gray-900 rounded-lg p-6 text-center">
-        <p className="text-gray-600 dark:text-gray-400">
-          Connect your wallet to post notes
-        </p>
-      </div>
-    );
-  }
-
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-lg">
-      <h2 className="text-2xl font-bold mb-4">Post a Note</h2>
-      
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <textarea
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="What's on your mind? (gm, hello world, etc.)"
-            maxLength={MAX_MESSAGE_LENGTH}
-            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 resize-none"
-            rows={4}
-            disabled={isPending || isConfirming}
-          />
-          <div className="flex justify-between items-center mt-2 text-sm">
-            <span className="text-gray-500 dark:text-gray-400">
-              {message.length}/{MAX_MESSAGE_LENGTH}
-            </span>
-          </div>
+    <div>
+      {/* Badge */}
+      <div className="badge mb-6" style={{ background: "#e8f5e9", color: "#2e7d32" }}>
+        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#4caf50" }}></span>
+        LIVE ON BASE SEPOLIA
+      </div>
+
+      {/* Heading */}
+      <h1 className="text-5xl md:text-6xl font-bold mb-6 leading-tight" style={{ color: "#1d1d1f" }}>
+        Share your thoughts{" "}
+        <span style={{ color: "#ff6b6b" }}>📝</span> on-chain
+      </h1>
+
+      {/* Subtitle */}
+      <p className="text-lg mb-8" style={{ color: "#6e6e73", lineHeight: "1.6" }}>
+        From thoughts to blockchain, we make permanent messages that live forever on Base network.
+      </p>
+
+      {/* Action Buttons */}
+      {!isConnected ? (
+        <div className="flex flex-wrap gap-4 mb-8">
+          <WalletConnect />
         </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="What's on your mind? (gm, hello world, etc.)"
+              maxLength={MAX_MESSAGE_LENGTH}
+              className="w-full px-5 py-4 rounded-2xl focus:outline-none focus:ring-2 focus:ring-offset-2 resize-none transition-all"
+              style={{ 
+                border: "1px solid #e5e5e7",
+                background: "#fafafa",
+                color: "#1d1d1f",
+                fontSize: "15px"
+              }}
+              rows={4}
+              disabled={isPending || isConfirming}
+            />
+            <div className="flex justify-between items-center mt-3 text-sm" style={{ color: "#86868b" }}>
+              <span>{message.length}/{MAX_MESSAGE_LENGTH} characters</span>
+            </div>
+          </div>
 
-        <button
-          type="submit"
-          disabled={!message.trim() || isPending || isConfirming}
-          className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
-        >
-          {isPending && "Confirming..."}
-          {isConfirming && "Posting..."}
-          {!isPending && !isConfirming && "Post Note"}
-        </button>
-      </form>
+          <div className="flex flex-wrap gap-4">
+            <button
+              type="submit"
+              disabled={!message.trim() || isPending || isConfirming}
+              className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isPending && "Confirming..."}
+              {isConfirming && "Posting to blockchain..."}
+              {!isPending && !isConfirming && "Post on-chain now"}
+            </button>
+            
+            <button
+              type="button"
+              onClick={() => setMessage("")}
+              className="btn-secondary"
+              disabled={!message}
+            >
+              ▶ Clear
+            </button>
+          </div>
+        </form>
+      )}
 
+      {/* Status Messages */}
       {isSuccess && (
-        <div className="mt-4 p-4 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-lg">
-          ✅ Note posted successfully!
+        <div className="mt-6 p-4 rounded-2xl flex items-center gap-3" style={{ background: "#e8f5e9" }}>
+          <span style={{ fontSize: "20px" }}>✨</span>
+          <span style={{ color: "#2e7d32", fontWeight: 500 }}>Note posted successfully on-chain!</span>
         </div>
       )}
 
       {error && (
-        <div className="mt-4 p-4 bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200 rounded-lg text-sm">
-          Error: {error.message}
+        <div className="mt-6 p-4 rounded-2xl" style={{ background: "#ffebee", color: "#c62828", fontSize: "14px" }}>
+          {error.message}
+        </div>
+      )}
+
+      {/* User Testimonials - Static */}
+      {isConnected && (
+        <div className="mt-12">
+          <div className="flex gap-1 mb-3">
+            {[...Array(5)].map((_, i) => (
+              <span key={i} style={{ color: "#ffd700", fontSize: "20px" }}>⭐</span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            {["🔵", "🟢", "🟣", "🟠"].map((emoji, i) => (
+              <div
+                key={i}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-xl"
+                style={{ background: "#f5f5f7" }}
+              >
+                {emoji}
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
