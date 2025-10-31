@@ -10,10 +10,6 @@ interface Note {
   timestamp: bigint;
 }
 
-interface GroupedNotes {
-  [date: string]: Note[];
-}
-
 export function NoteFeed() {
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -52,57 +48,25 @@ export function NoteFeed() {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
 
-  const formatTime = (timestamp: bigint) => {
-    const date = new Date(Number(timestamp) * 1000);
-    return date.toLocaleTimeString('en-US', { 
-      hour: 'numeric', 
-      minute: '2-digit',
-      hour12: true 
-    });
-  };
-
   const formatTimestamp = (timestamp: bigint) => {
     const date = new Date(Number(timestamp) * 1000);
     const now = new Date();
     const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
 
-    if (diffInSeconds < 60) return `${diffInSeconds}s`;
-    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m`;
-    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h`;
-    return `${Math.floor(diffInSeconds / 86400)}d`;
-  };
-
-  const groupNotesByDate = (notes: Note[]): GroupedNotes => {
-    const grouped: GroupedNotes = {};
-    notes.forEach(note => {
-      const date = new Date(Number(note.timestamp) * 1000);
-      const dateKey = date.toLocaleDateString('en-US', { 
-        weekday: 'short' 
-      }).toUpperCase();
-      const dayMonth = date.toLocaleDateString('en-US', { 
-        day: 'numeric',
-        month: 'short'
-      }).toUpperCase();
-      const key = `${dateKey}|${dayMonth}`;
-      
-      if (!grouped[key]) {
-        grouped[key] = [];
-      }
-      grouped[key].push(note);
-    });
-    return grouped;
-  };
-
-  const getAuthorEmoji = (addr: string) => {
-    const emojis = ["🔵", "🟢", "🟣", "🟠", "🔴", "🟡", "🟤", "⚫"];
-    const index = parseInt(addr.slice(2, 4), 16) % emojis.length;
-    return emojis[index];
+    if (diffInSeconds < 60) return "Just now";
+    if (diffInSeconds < 300) return "2 minutes ago";
+    if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+    if (diffInSeconds < 7200) return "1 hour ago";
+    if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+    if (diffInSeconds < 172800) return "1 day ago";
+    if (diffInSeconds < 2592000) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+    return `${Math.floor(diffInSeconds / 2592000)} months ago`;
   };
 
   if (!CONTRACT_ADDRESS) {
     return (
       <div className="text-center py-8">
-        <p style={{ color: "#86868b", fontSize: "14px" }}>
+        <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>
           ⚠️ Contract not configured
         </p>
       </div>
@@ -112,7 +76,7 @@ export function NoteFeed() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-transparent" style={{ borderColor: "#1d1d1f" }}></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-transparent" style={{ borderColor: "var(--blue-primary)" }}></div>
       </div>
     );
   }
@@ -128,89 +92,68 @@ export function NoteFeed() {
   }
 
   const notesArray = (notes as Note[]) || [];
-  const groupedNotes = groupNotesByDate([...notesArray].reverse());
+
+  if (notesArray.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 text-center">
+        <div className="text-6xl mb-4">📝</div>
+        <p style={{ color: "var(--text-muted)", fontSize: "15px" }}>
+          No notes yet
+        </p>
+        <p style={{ color: "var(--text-muted)", fontSize: "13px", marginTop: "4px" }}>
+          Be the first to post!
+        </p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col h-full">
-      {notesArray.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center">
-          <div className="text-6xl mb-4">📝</div>
-          <p style={{ color: "#86868b", fontSize: "15px" }}>
-            No notes yet
-          </p>
-          <p style={{ color: "#86868b", fontSize: "13px", marginTop: "4px" }}>
-            Be the first to post!
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-8">
-          {Object.entries(groupedNotes).map(([dateKey, dayNotes]) => {
-            const [weekday, dayMonth] = dateKey.split('|');
-            return (
-              <div key={dateKey}>
-                {/* Date Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-xs tracking-wide" style={{ color: "#86868b" }}>
-                    {weekday}
-                  </h3>
-                  <span className="text-xs" style={{ color: "#c7c7cc" }}>
-                    {dayMonth}
-                  </span>
-                </div>
+    <div>
+      {/* Section Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+          Recent Notes
+        </h2>
+        <button className="text-sm" style={{ color: "var(--text-muted)" }}>
+          •••
+        </button>
+      </div>
 
-                {/* Notes for this date */}
-                <div className="space-y-3">
-                  {dayNotes.map((note, index) => (
-                    <div
-                      key={`${note.timestamp}-${index}`}
-                      className="flex items-start gap-3 p-4 rounded-2xl transition-all hover:shadow-sm"
-                      style={{ background: "#fafafa", border: "1px solid #f0f0f0" }}
-                    >
-                      {/* Avatar */}
-                      <div 
-                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 text-xl"
-                        style={{ background: "#ffffff" }}
-                      >
-                        {getAuthorEmoji(note.author)}
-                      </div>
+      {/* Notes Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[...notesArray].reverse().slice(0, 6).map((note, index) => (
+          <div
+            key={`${note.timestamp}-${index}`}
+            className={`note-card ${index === notesArray.length - 1 ? "highlighted" : ""}`}
+          >
+            {/* Timestamp */}
+            <div className="text-xs mb-3" style={{ color: "var(--text-secondary)" }}>
+              {formatTimestamp(note.timestamp)}
+            </div>
 
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <h4 className="font-semibold text-sm" style={{ color: "#1d1d1f" }}>
-                            Note from {formatAddress(note.author)}
-                          </h4>
-                          <span className="text-xs flex-shrink-0 px-2 py-1 rounded-full" style={{ 
-                            background: "#f0f0f0",
-                            color: "#86868b"
-                          }}>
-                            {formatTimestamp(note.timestamp)}
-                          </span>
-                        </div>
-                        <p className="text-sm leading-relaxed break-words" style={{ color: "#6e6e73" }}>
-                          {note.message}
-                        </p>
-                        <p className="text-xs mt-2" style={{ color: "#c7c7cc" }}>
-                          {formatTime(note.timestamp)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+            {/* Title & Badge */}
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <h3 className="font-semibold text-base" style={{ color: index === notesArray.length - 1 ? "var(--blue-primary)" : "var(--text-primary)" }}>
+                {note.message.slice(0, 30)}{note.message.length > 30 ? "..." : ""}
+              </h3>
+              <span className="badge badge-gray flex-shrink-0">
+                On-Chain
+              </span>
+            </div>
 
-      {/* Total Count */}
-      {notesArray.length > 0 && (
-        <div className="mt-8 pt-6 text-center" style={{ borderTop: "1px solid #f0f0f0" }}>
-          <p className="text-xs" style={{ color: "#86868b" }}>
-            {notesArray.length} note{notesArray.length !== 1 ? 's' : ''} on-chain
-          </p>
-        </div>
-      )}
+            {/* Description */}
+            <p className="text-sm leading-relaxed mb-4" style={{ color: index === notesArray.length - 1 ? "var(--blue-primary)" : "var(--text-secondary)" }}>
+              {note.message.length > 80 ? note.message : `Posted by ${formatAddress(note.author)}`}
+            </p>
+
+            {/* Footer */}
+            <div className="flex items-center justify-between text-xs" style={{ color: "var(--text-muted)" }}>
+              <span>{formatAddress(note.author)}</span>
+              <span>Base Sepolia</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

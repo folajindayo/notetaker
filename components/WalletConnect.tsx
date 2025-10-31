@@ -14,17 +14,27 @@ export function WalletConnect() {
 
   if (isConnected && address) {
     return (
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="px-5 py-3 rounded-2xl" style={{ background: "#f5f5f7", border: "1px solid #e5e5e7" }}>
-          <span className="font-mono text-sm" style={{ color: "#1d1d1f" }}>
-            {formatAddress(address)}
-          </span>
+      <div className="flex items-center gap-2">
+        <div 
+          className="px-4 py-2 rounded-lg text-sm font-mono"
+          style={{ 
+            background: "var(--blue-light)", 
+            color: "var(--blue-primary)",
+            border: "1px solid var(--blue-primary)"
+          }}
+        >
+          {formatAddress(address)}
         </div>
         <button
           onClick={() => disconnect()}
-          className="btn-secondary text-sm"
+          className="btn-icon"
+          title="Disconnect"
         >
-          Disconnect
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
         </button>
       </div>
     );
@@ -33,7 +43,11 @@ export function WalletConnect() {
   return (
     <button
       onClick={() => open()}
-      className="btn-primary"
+      className="px-6 py-2 rounded-lg text-sm font-medium"
+      style={{
+        background: "var(--blue-primary)",
+        color: "white"
+      }}
     >
       Connect Wallet
     </button>
