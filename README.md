@@ -1,186 +1,279 @@
-# 📝 On-Chain Note Board
+# 🚀 NoteBoard - Complete Web3 Social Platform
 
-A decentralized application (dApp) built on Base network that allows users to post and read short messages stored on the blockchain. Think of it as a permanent, immutable message board where anyone can share their thoughts!
+A comprehensive decentralized social media platform built on Base blockchain with Next.js. Features notes, communities, polls, subscriptions, rewards, and more - all on-chain!
 
-## 🌟 Features
+## ✨ Key Features
 
-- **Connect Wallet**: Seamless wallet connection using Reown AppKit (formerly WalletConnect)
-- **Post Notes**: Write messages up to 280 characters and store them on-chain
-- **View Feed**: Browse all notes in a beautiful, real-time updating feed
-- **Base Network**: Deployed on Base Sepolia testnet (low gas fees!)
-- **Modern UI**: Responsive design with dark mode support
+### 📝 Content Creation
+- Post notes (max 280 characters) with IPFS media attachments
+- Add tags (up to 5 per note)
+- Create conversation threads
+- Mention users with @ addresses
+- Create polls (2-10 options, time-limited)
+- Edit and delete your notes
+- Reply to notes
+- Quote repost notes
+
+### 🎭 Social Interactions
+- ❤️ Like/Unlike posts
+- 😊 6 Emoji reactions (LIKE, LOVE, LAUGH, WOW, SAD, ANGRY)
+- 👥 Follow/unfollow users
+- 🚫 Block and mute users
+- 🔖 Bookmark notes for later
+- 📌 Pin up to 3 notes to your profile
+
+### 💰 Monetization & Rewards
+- 💎 Earn reward points (10 per note, 5 per like, 3 per reply)
+- 🎁 Convert points to ETH
+- 💸 Tip creators with ETH
+- 💳 Creator subscriptions (set your own price)
+- ⭐ Premium accounts (0.01 ETH)
+- 📊 Track total earnings
+
+### 👥 Communities
+- Create public/private communities
+- Set community subscription fees
+- Community member management
+- Exclusive community content
+- Community browsing and discovery
+
+### 🏆 Gamification
+- 🏅 20+ Achievement badges
+- 🔥 Activity streak tracking
+- 📊 Leaderboards
+- 💎 Point-based rewards
+- 🎯 Milestone celebrations
+
+### 👤 User Profiles
+- Custom usernames and bios
+- 🖼️ NFT profile pictures
+- ✅ Verified user badges
+- 📈 Complete statistics
+- 📅 Join date and activity tracking
+- 🏆 Badge collection display
+
+### 🔍 Discovery
+- Full-text search in notes
+- Personalized feed from followed users
+- Trending notes algorithm
+- Tag-based exploration
+- Community browser
+- User leaderboards
+
+### 🛡️ Moderation
+- Community reporting system
+- Auto-delete after 10 reports
+- Moderator roles and permissions
+- User verification system
+- Content flagging
+
+## 🎨 Pages
+
+- `/` - Home feed with all notes
+- `/profile/[address]` - User profile pages
+- `/communities` - Browse and create communities
+- `/leaderboard` - Top users rankings
+- `/rewards` - Rewards dashboard
 
 ## 🛠️ Tech Stack
 
 - **Frontend**: Next.js 16, React 19, TypeScript
-- **Styling**: TailwindCSS with NativeWind
-- **Web3**: wagmi v2, viem v2, Reown AppKit
+- **Styling**: Tailwind CSS
+- **Web3**: Wagmi v2, Viem v2, Reown AppKit
 - **Smart Contracts**: Solidity 0.8.28, Hardhat
-- **Network**: Base Sepolia (testnet) / Base Mainnet
+- **Network**: Base (Ethereum L2)
 
-## 📋 Prerequisites
+## 🏗️ Smart Contract
 
-Before you begin, ensure you have:
+The NoteBoard.sol contract is a production-ready, feature-complete social platform:
 
-- Node.js 18+ installed
-- A wallet (MetaMask, Coinbase Wallet, etc.)
-- Base Sepolia ETH for gas fees ([get from faucet](https://www.coinbase.com/faucets/base-ethereum-goerli-faucet))
-- A WalletConnect Project ID ([create one free](https://cloud.reown.com/))
+- **1,700+ lines** of Solidity code
+- **40+ write functions** for interactions
+- **35+ read functions** for data retrieval
+- **27 events** for real-time updates
+- **30+ mappings** for efficient data storage
+- **4 structs**: Note, Reply, Poll, Community, Subscription, UserProfile
+
+### Core Contract Features
+
+1. **Notes System**: Post, edit, delete, like, reply, repost
+2. **Reactions**: 6 types of emoji reactions
+3. **Polls**: Time-limited polls with multiple options
+4. **Communities**: Public/private groups with fees
+5. **Subscriptions**: Creator monetization
+6. **Rewards**: Point-based engagement system
+7. **User Profiles**: Usernames, bios, avatars, verification
+8. **Social Graph**: Follow, block, mute functionality
+9. **Content Moderation**: Reporting and auto-deletion
+10. **NFT Integration**: NFT profile pictures
 
 ## 🚀 Quick Start
 
-### 1. Clone and Install
+### Prerequisites
+
+- Node.js 18+
+- MetaMask or compatible Web3 wallet
+- Base Sepolia ETH ([get from faucet](https://www.coinbase.com/faucets))
+- WalletConnect Project ID ([create free](https://cloud.reown.com/))
+
+### Installation
+
+1. **Clone and install dependencies:**
 
 ```bash
-cd /Users/mac/notetaker
+git clone https://github.com/yourusername/notetaker.git
+cd notetaker
 npm install
 ```
 
-### 2. Set Up Environment Variables
+2. **Set up environment variables:**
 
-Copy the example environment file:
-
-```bash
-cp .env.local.example .env.local
-```
-
-Edit `.env.local` and add your values:
+Create `.env.local`:
 
 ```env
-# Get from https://cloud.reown.com/
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
+# WalletConnect Project ID (from https://cloud.reown.com/)
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id
 
-# For contract deployment
-PRIVATE_KEY=your_wallet_private_key_here
+# Deployment keys
+PRIVATE_KEY=your_wallet_private_key
 BASE_SEPOLIA_RPC_URL=https://sepolia.base.org
 
-# BaseScan API Key for contract verification (optional)
-BASESCAN_API_KEY=your_basescan_api_key
+# Contract address (fill after deployment)
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x...
 
-# Will be filled after deployment
-NEXT_PUBLIC_CONTRACT_ADDRESS=
+# Optional: BaseScan API key for verification
+BASESCAN_API_KEY=your_api_key
 ```
 
-### 3. Compile Smart Contract
+3. **Compile the smart contract:**
 
 ```bash
 npm run compile
 ```
 
-This compiles the `NoteBoard.sol` contract and generates TypeScript types.
-
-### 4. Deploy to Base Sepolia
+4. **Deploy to Base Sepolia:**
 
 ```bash
 npm run deploy:sepolia
 ```
 
-After deployment, you'll see output like:
+Copy the deployed contract address to your `.env.local` file.
 
-```
-NoteBoard deployed to: 0x123...abc
-Add this to your .env.local file:
-NEXT_PUBLIC_CONTRACT_ADDRESS=0x123...abc
-```
-
-**Important**: Copy the contract address to your `.env.local` file!
-
-### 5. Verify Contract (Optional)
-
-```bash
-npx hardhat verify --network baseSepolia YOUR_CONTRACT_ADDRESS
-```
-
-### 6. Run the Development Server
+5. **Run the development server:**
 
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser!
+Open [http://localhost:3000](http://localhost:3000) to start using the app!
 
 ## 📁 Project Structure
 
 ```
 notetaker/
-├── app/                      # Next.js App Router
-│   ├── layout.tsx           # Root layout with Web3Provider
-│   ├── page.tsx             # Main page
-│   └── globals.css          # Global styles
-├── components/              # React components
-│   ├── WalletConnect.tsx    # Wallet connection UI
-│   ├── PostNote.tsx         # Note posting form
-│   └── NoteFeed.tsx         # Notes display feed
-├── contracts/               # Solidity smart contracts
-│   └── NoteBoard.sol        # Main contract
-├── lib/                     # Utility functions
-│   ├── wagmi.ts            # wagmi & Reown configuration
-│   ├── constants.ts        # Contract ABI and address
-│   └── Web3Provider.tsx    # Web3 context provider
-├── scripts/                 # Deployment scripts
-│   └── deploy.ts           # Hardhat deployment
-├── ignition/               # Hardhat Ignition modules
-│   └── modules/
-│       └── NoteBoard.ts    # Ignition deployment module
-├── hardhat.config.ts       # Hardhat configuration
-├── tailwind.config.ts      # Tailwind configuration
-└── README.md              # This file
+├── app/                        # Next.js app directory
+│   ├── page.tsx               # Home feed
+│   ├── layout.tsx             # Root layout
+│   ├── communities/           # Communities page
+│   │   └── page.tsx
+│   ├── leaderboard/           # Leaderboard page
+│   │   └── page.tsx
+│   ├── profile/[address]/     # Dynamic user profiles
+│   │   └── page.tsx
+│   ├── rewards/               # Rewards dashboard
+│   │   └── page.tsx
+│   └── globals.css            # Global styles
+├── components/                 # React components
+│   ├── BottomToolbar.tsx      # Action toolbar
+│   ├── CreatePollModal.tsx    # Poll creation
+│   ├── MainContent.tsx        # Main content area
+│   ├── NoteFeed.tsx          # Notes display
+│   ├── PollCard.tsx          # Poll voting UI
+│   ├── PostNoteModal.tsx     # Note creation
+│   ├── Sidebar.tsx           # Navigation
+│   └── WalletConnect.tsx     # Wallet UI
+├── contracts/                 # Solidity contracts
+│   └── NoteBoard.sol         # Main contract (1700+ lines)
+├── lib/                      # Utilities
+│   ├── constants.ts          # Contract config
+│   ├── wagmi.ts             # Web3 config
+│   └── Web3Provider.tsx     # Context provider
+├── scripts/                  # Deployment
+│   └── deploy.ts
+├── hardhat.config.ts         # Hardhat config
+├── tailwind.config.ts        # Tailwind config
+└── README.md                 # This file
 ```
 
-## 📝 Smart Contract
+## 📜 Smart Contract Functions
 
-### NoteBoard.sol
+### Write Functions (40+)
+- `postNote`, `editNote`, `deleteNote`
+- `likeNote`, `unlikeNote`, `reactToNote`
+- `postReply`, `repostNote`
+- `createPoll`, `voteOnPoll`
+- `followUser`, `unfollowUser`
+- `blockUser`, `muteUser`
+- `bookmarkNote`, `pinNote`
+- `createCommunity`, `joinCommunity`
+- `subscribe`, `tipNote`
+- `claimRewards`, `upgradeToPremium`
+- `reportNote`, `verifyUser`
+- And more!
 
-The smart contract includes:
+### Read Functions (35+)
+- `getAllNotes`, `getActiveNotes`, `getTrendingNotes`
+- `getNotesByAuthor`, `getNotesByTag`
+- `getUserProfile`, `getUserBadges`
+- `getCommunities`, `getCommunityMembers`
+- `getRewardPoints`, `getTotalEarnings`
+- `getFeed`, `searchNotes`
+- `getPlatformStats`
+- And more!
 
-**Struct:**
-```solidity
-struct Note {
-    address author;
-    string message;
-    uint256 timestamp;
-}
+## 🎯 Usage Examples
+
+### Post a Note
+
+```typescript
+// With tags and media
+writeContract({
+  functionName: "postNote",
+  args: [
+    "Hello Web3!",                    // message
+    ["welcome", "blockchain"],        // tags
+    "ipfs://Qm...",                   // IPFS hash
+    0n,                               // threadId (0 for new)
+    0n,                               // replyToNoteId
+    []                                // mentions
+  ]
+});
 ```
 
-**Key Functions:**
-- `postNote(string calldata _message)`: Post a new note (max 280 chars)
-- `getAllNotes()`: Get all notes from the board
-- `getTotalNotes()`: Get the count of all notes
-- `getNote(uint256 _noteId)`: Get a specific note by ID
-- `getNotesByAuthor(address _author)`: Get all notes from a specific author
+### Create a Poll
 
-**Events:**
-- `NotePosted(uint256 noteId, address author, string message, uint256 timestamp)`
-
-## 🎨 Component Overview
-
-### WalletConnect
-- Displays wallet connection button
-- Shows connected address in truncated format
-- Disconnect functionality
-
-### PostNote
-- Text area for message input (max 280 chars)
-- Character counter
-- Transaction status feedback
-- Auto-reset after successful post
-
-### NoteFeed
-- Real-time display of all notes
-- Auto-refresh on new blocks
-- Event-based updates
-- Reverse chronological order
-- Formatted timestamps and addresses
-
-## 🧪 Testing
-
-Run Hardhat tests (if you add test files):
-
-```bash
-npx hardhat test
+```typescript
+writeContract({
+  functionName: "createPoll",
+  args: [
+    noteId,                           // Note to attach poll to
+    ["Option A", "Option B"],         // Poll options
+    86400n                            // Duration (24 hours)
+  ]
+});
 ```
 
-## 🌐 Deployment
+### Join a Community
+
+```typescript
+writeContract({
+  functionName: "joinCommunity",
+  args: [communityId],
+  value: subscriptionFee             // Pay community fee
+});
+```
+
+## 🚢 Deployment
 
 ### To Base Sepolia (Testnet)
 
@@ -190,75 +283,91 @@ npm run deploy:sepolia
 
 ### To Base Mainnet (Production)
 
-⚠️ **Only when ready for production!**
+⚠️ **Only when ready!**
 
 ```bash
 npm run deploy:base
 ```
 
+### Verify Contract
+
+```bash
+npx hardhat verify --network baseSepolia CONTRACT_ADDRESS
+```
+
+## 🧪 Testing
+
+Run contract tests:
+
+```bash
+npx hardhat test
+```
+
+## 🎨 Component Highlights
+
+### NoteFeed
+Real-time updating feed with auto-refresh on new blocks and event-based updates.
+
+### PostNoteModal
+Rich note creation with:
+- Character counter
+- Tag input
+- IPFS media attachment
+- Poll creation option
+- Mention support
+
+### PollCard
+Interactive poll voting with:
+- Real-time vote percentages
+- Visual progress bars
+- Vote submission
+- Time remaining display
+
+### Profile Page
+Complete user profiles showing:
+- Stats (notes, followers, streak)
+- Badges collection
+- Pinned notes
+- Activity feed
+- Follow/subscribe buttons
+
 ## 🔧 Troubleshooting
 
-### "Contract address not configured"
+### Contract Address Not Configured
+1. Deploy contract: `npm run deploy:sepolia`
+2. Add address to `.env.local`
+3. Restart dev server
 
-Make sure you've:
-1. Deployed the contract: `npm run deploy:sepolia`
-2. Added the address to `.env.local`: `NEXT_PUBLIC_CONTRACT_ADDRESS=0x...`
-3. Restarted the dev server
+### Insufficient Funds
+Get Base Sepolia ETH from [Base Faucet](https://www.coinbase.com/faucets)
 
-### "User rejected the request"
-
-This happens when you cancel a wallet transaction. Simply try again!
-
-### "Insufficient funds"
-
-Get Base Sepolia ETH from the [Base faucet](https://www.coinbase.com/faucets/base-ethereum-goerli-faucet).
-
-### Network mismatch
-
-Make sure your wallet is connected to Base Sepolia network:
+### Network Mismatch
+Switch to Base Sepolia in your wallet:
 - Chain ID: 84532
 - RPC: https://sepolia.base.org
 
 ## 📚 Resources
 
 - [Base Documentation](https://docs.base.org/)
-- [wagmi Documentation](https://wagmi.sh/)
-- [Reown AppKit Docs](https://docs.reown.com/appkit/overview)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Hardhat Documentation](https://hardhat.org/docs)
+- [Wagmi Documentation](https://wagmi.sh/)
+- [Next.js Documentation](https://nextjs.org/)
+- [Hardhat Documentation](https://hardhat.org/)
 - [Solidity Documentation](https://docs.soliditylang.org/)
 
 ## 🤝 Contributing
 
-Feel free to fork, improve, and submit pull requests!
+Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📄 License
 
-MIT License - feel free to use this project however you'd like!
+MIT License
 
-## 🎉 What's Next?
+## 🙏 Acknowledgments
 
-Ideas to extend this project:
-
-- Add like/reaction functionality
-- Implement note editing/deletion (with ownership checks)
-- Add user profiles with ENS support
-- Create note categories or hashtags
-- Add media attachments (IPFS integration)
-- Implement pagination for large feeds
-- Add search and filter functionality
-- Create a trending notes section
-- Add tipping functionality
-
-## 💡 Tips
-
-- Keep messages under 280 characters to save on gas
-- Each transaction costs gas - posts are permanent!
-- Use Base network for lower gas fees vs Ethereum mainnet
-- Always test on Sepolia testnet before deploying to mainnet
+Built with ❤️ for the Web3 community using Next.js, Wagmi, and Base.
 
 ---
 
-Built with ❤️ using Next.js, wagmi, and Base
+**Note**: This is a fully decentralized application. All data is stored on the blockchain and transactions require gas fees. Always test on testnet before deploying to mainnet!
 
-Happy posting! 🚀
+🚀 Happy posting and building the decentralized social future!
