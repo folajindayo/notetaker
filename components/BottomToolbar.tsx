@@ -8,13 +8,7 @@ export function BottomToolbar() {
 
   return (
     <>
-      <div 
-        className="fixed bottom-0 left-[280px] right-0 border-t px-8 py-4 flex items-center justify-between"
-        style={{ 
-          background: "var(--bg-secondary)", 
-          borderColor: "var(--border-light)" 
-        }}
-      >
+      <div className="fixed bottom-0 left-[280px] right-0 border-t border-gray-200 bg-white px-8 py-4 flex items-center justify-between">
         {/* Left Actions */}
         <div className="flex items-center gap-2">
           <button className="btn-icon" title="Mark complete">
@@ -86,3 +80,4 @@ export function BottomToolbar() {
     </>
   );
 }
+

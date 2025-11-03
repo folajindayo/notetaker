@@ -8,13 +8,7 @@ export function Sidebar() {
   const { isConnected } = useAccount();
 
   return (
-    <aside 
-      className="w-[280px] flex-shrink-0 flex flex-col border-r"
-      style={{ 
-        background: "var(--bg-sidebar)", 
-        borderColor: "var(--border-light)" 
-      }}
-    >
+    <aside className="w-[280px] flex-shrink-0 flex flex-col border-r border-gray-200 bg-gray-50">
       {/* Mac Window Controls */}
       <div className="flex items-center gap-2 px-4 py-4">
         <div className="w-3 h-3 rounded-full bg-red-500"></div>
@@ -73,7 +67,7 @@ export function Sidebar() {
         {/* Networks Section */}
         <div className="mb-6">
           <div className="px-4 mb-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
               Networks
             </h3>
           </div>
@@ -95,7 +89,7 @@ export function Sidebar() {
         {/* Stats Section */}
         <div>
           <div className="px-4 mb-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-400">
               Stats
             </h3>
           </div>
@@ -105,7 +99,7 @@ export function Sidebar() {
               <line x1="12" y1="5" x2="12" y2="19"/>
               <line x1="5" y1="12" x2="19" y2="12"/>
             </svg>
-            <span style={{ color: "var(--text-secondary)" }}>Total Notes</span>
+            <span className="text-gray-600">Total Notes</span>
           </div>
 
           <div className="sidebar-item cursor-default hover:bg-transparent">
@@ -115,7 +109,7 @@ export function Sidebar() {
               <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
               <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
-            <span style={{ color: "var(--text-secondary)" }}>Contributors</span>
+            <span className="text-gray-600">Contributors</span>
           </div>
         </div>
       </nav>
@@ -139,3 +133,4 @@ export function Sidebar() {
     </aside>
   );
 }
+

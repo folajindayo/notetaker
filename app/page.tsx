@@ -6,7 +6,7 @@ import { BottomToolbar } from "@/components/BottomToolbar";
 
 export default function Home() {
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "var(--bg-primary)" }}>
+    <div className="flex h-screen overflow-hidden bg-gray-50">
       {/* Left Sidebar */}
       <Sidebar />
 

@@ -11,22 +11,15 @@ export function MainContent() {
   const { isConnected } = useAccount();
 
   return (
-    <main className="flex-1 flex flex-col overflow-hidden" style={{ background: "var(--bg-secondary)" }}>
+    <main className="flex-1 flex flex-col overflow-hidden bg-white">
       {/* Header */}
-      <header className="border-b px-8 py-6" style={{ borderColor: "var(--border-light)" }}>
+      <header className="border-b border-gray-200 px-8 py-6">
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-semibold" style={{ color: "var(--text-primary)" }}>
+            <h1 className="text-3xl font-semibold text-gray-900">
               On-Chain Notes
             </h1>
-            <span 
-              className="text-xs px-2 py-1 rounded" 
-              style={{ 
-                background: "var(--blue-light)", 
-                color: "var(--blue-primary)",
-                fontWeight: 500
-              }}
-            >
+            <span className="text-xs px-2 py-1 rounded bg-blue-100 text-blue-600 font-medium">
               BASE
             </span>
           </div>
@@ -48,18 +41,12 @@ export function MainContent() {
             >
               <span className="flex items-center gap-2">
                 Notes
-                <span 
-                  className="text-xs px-1.5 py-0.5 rounded" 
-                  style={{ background: "var(--blue-light)", color: "var(--blue-primary)" }}
-                >
+                <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-600">
                   10
                 </span>
               </span>
               {activeTab === "notes" && (
-                <div 
-                  className="absolute bottom-0 left-0 right-0 h-0.5"
-                  style={{ background: "var(--blue-primary)" }}
-                ></div>
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
               )}
             </button>
 
@@ -147,18 +134,17 @@ export function MainContent() {
                   fill="none" 
                   stroke="currentColor" 
                   strokeWidth="1.5"
-                  className="mx-auto"
-                  style={{ color: "var(--text-muted)" }}
+                  className="mx-auto text-gray-400"
                 >
                   <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
                   <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
                   <line x1="12" y1="22.08" x2="12" y2="12"/>
                 </svg>
               </div>
-              <h3 className="text-xl font-semibold mb-2" style={{ color: "var(--text-primary)" }}>
+              <h3 className="text-xl font-semibold mb-2 text-gray-900">
                 Connect Your Wallet
               </h3>
-              <p className="text-sm mb-6" style={{ color: "var(--text-secondary)" }}>
+              <p className="text-sm mb-6 text-gray-600">
                 Connect your wallet to view and post notes on the Base blockchain
               </p>
               <WalletConnect />
@@ -169,3 +155,4 @@ export function MainContent() {
     </main>
   );
 }
+

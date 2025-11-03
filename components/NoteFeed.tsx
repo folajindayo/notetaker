@@ -66,7 +66,7 @@ export function NoteFeed() {
   if (!CONTRACT_ADDRESS) {
     return (
       <div className="text-center py-8">
-        <p style={{ color: "var(--text-muted)", fontSize: "14px" }}>
+        <p className="text-gray-400 text-sm">
           ⚠️ Contract not configured
         </p>
       </div>
@@ -76,7 +76,7 @@ export function NoteFeed() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-t-transparent" style={{ borderColor: "var(--blue-primary)" }}></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
@@ -84,7 +84,7 @@ export function NoteFeed() {
   if (error) {
     return (
       <div className="text-center py-8">
-        <p style={{ color: "#ff3b30", fontSize: "14px" }}>
+        <p className="text-red-500 text-sm">
           Error loading notes
         </p>
       </div>
@@ -97,10 +97,10 @@ export function NoteFeed() {
     return (
       <div className="flex flex-col items-center justify-center py-16 text-center">
         <div className="text-6xl mb-4">📝</div>
-        <p style={{ color: "var(--text-muted)", fontSize: "15px" }}>
+        <p className="text-gray-400 text-[15px]">
           No notes yet
         </p>
-        <p style={{ color: "var(--text-muted)", fontSize: "13px", marginTop: "4px" }}>
+        <p className="text-gray-400 text-[13px] mt-1">
           Be the first to post!
         </p>
       </div>
@@ -111,10 +111,10 @@ export function NoteFeed() {
     <div>
       {/* Section Header */}
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--text-primary)" }}>
+        <h2 className="text-lg font-semibold text-gray-900">
           Recent Notes
         </h2>
-        <button className="text-sm" style={{ color: "var(--text-muted)" }}>
+        <button className="text-sm text-gray-400">
           •••
         </button>
       </div>
@@ -127,13 +127,13 @@ export function NoteFeed() {
             className={`note-card ${index === notesArray.length - 1 ? "highlighted" : ""}`}
           >
             {/* Timestamp */}
-            <div className="text-xs mb-3" style={{ color: "var(--text-secondary)" }}>
+            <div className="text-xs mb-3 text-gray-600">
               {formatTimestamp(note.timestamp)}
             </div>
 
             {/* Title & Badge */}
             <div className="flex items-start justify-between gap-2 mb-3">
-              <h3 className="font-semibold text-base" style={{ color: index === notesArray.length - 1 ? "var(--blue-primary)" : "var(--text-primary)" }}>
+              <h3 className={`font-semibold text-base ${index === notesArray.length - 1 ? "text-blue-600" : "text-gray-900"}`}>
                 {note.message.slice(0, 30)}{note.message.length > 30 ? "..." : ""}
               </h3>
               <span className="badge badge-gray flex-shrink-0">
@@ -142,12 +142,12 @@ export function NoteFeed() {
             </div>
 
             {/* Description */}
-            <p className="text-sm leading-relaxed mb-4" style={{ color: index === notesArray.length - 1 ? "var(--blue-primary)" : "var(--text-secondary)" }}>
+            <p className={`text-sm leading-relaxed mb-4 ${index === notesArray.length - 1 ? "text-blue-600" : "text-gray-600"}`}>
               {note.message.length > 80 ? note.message : `Posted by ${formatAddress(note.author)}`}
             </p>
 
             {/* Footer */}
-            <div className="flex items-center justify-between text-xs" style={{ color: "var(--text-muted)" }}>
+            <div className="flex items-center justify-between text-xs text-gray-400">
               <span>{formatAddress(note.author)}</span>
               <span>Base Sepolia</span>
             </div>

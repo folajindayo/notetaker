@@ -41,18 +41,16 @@ export function PostNoteModal({ onClose }: PostNoteModalProps) {
 
   return (
     <div 
-      className="fixed inset-0 flex items-center justify-center z-50"
-      style={{ background: "rgba(0, 0, 0, 0.5)" }}
+      className="fixed inset-0 flex items-center justify-center z-50 bg-black/50"
       onClick={onClose}
     >
       <div 
-        className="w-full max-w-lg mx-4 rounded-2xl p-6"
-        style={{ background: "var(--bg-secondary)", boxShadow: "0 20px 60px rgba(0, 0, 0, 0.3)" }}
+        className="w-full max-w-lg mx-4 rounded-2xl p-6 bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-xl font-semibold" style={{ color: "var(--text-primary)" }}>
+          <h2 className="text-xl font-semibold text-gray-900">
             Post New Note
           </h2>
           <button 
@@ -74,26 +72,19 @@ export function PostNoteModal({ onClose }: PostNoteModalProps) {
               onChange={(e) => setMessage(e.target.value)}
               placeholder="What's on your mind? Share your thoughts on-chain..."
               maxLength={MAX_MESSAGE_LENGTH}
-              className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none focus:ring-2 transition-all"
-              style={{ 
-                border: "1px solid var(--border-light)",
-                background: "var(--bg-primary)",
-                color: "var(--text-primary)",
-                minHeight: "120px"
-              }}
+              className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-600 transition-all border border-gray-200 bg-gray-50 text-gray-900 min-h-[120px]"
               disabled={isPending || isConfirming}
               autoFocus
             />
             <div className="flex justify-between items-center mt-2">
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+              <span className="text-xs text-gray-400">
                 {message.length}/{MAX_MESSAGE_LENGTH} characters
               </span>
               {message.length > 0 && (
                 <button
                   type="button"
                   onClick={() => setMessage("")}
-                  className="text-xs"
-                  style={{ color: "var(--blue-primary)" }}
+                  className="text-xs text-blue-600 hover:text-blue-700"
                 >
                   Clear
                 </button>
@@ -103,7 +94,7 @@ export function PostNoteModal({ onClose }: PostNoteModalProps) {
 
           {/* Status Messages */}
           {isSuccess && (
-            <div className="mb-4 p-3 rounded-lg flex items-center gap-2" style={{ background: "#e8f5e9", color: "#2e7d32" }}>
+            <div className="mb-4 p-3 rounded-lg flex items-center gap-2 bg-green-50 text-green-800">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <polyline points="20 6 9 17 4 12"/>
               </svg>
@@ -112,7 +103,7 @@ export function PostNoteModal({ onClose }: PostNoteModalProps) {
           )}
 
           {error && (
-            <div className="mb-4 p-3 rounded-lg" style={{ background: "#ffebee", color: "#c62828" }}>
+            <div className="mb-4 p-3 rounded-lg bg-red-50 text-red-800">
               <p className="text-sm">{error.message}</p>
             </div>
           )}
@@ -122,22 +113,14 @@ export function PostNoteModal({ onClose }: PostNoteModalProps) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-6 py-3 rounded-lg font-medium transition-all"
-              style={{ 
-                background: "var(--bg-primary)", 
-                color: "var(--text-secondary)" 
-              }}
+              className="flex-1 px-6 py-3 rounded-lg font-medium transition-all bg-gray-100 text-gray-700 hover:bg-gray-200"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={!message.trim() || isPending || isConfirming}
-              className="flex-1 px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{ 
-                background: "var(--blue-primary)", 
-                color: "white" 
-              }}
+              className="flex-1 px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-blue-600 text-white hover:bg-blue-700"
             >
               {isPending && "Confirming..."}
               {isConfirming && "Posting..."}
@@ -149,3 +132,4 @@ export function PostNoteModal({ onClose }: PostNoteModalProps) {
     </div>
   );
 }
+
