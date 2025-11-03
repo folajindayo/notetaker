@@ -21,6 +21,9 @@ contract NoteBoard {
         string ipfsHash;
         uint256 tipAmount;
         uint256 repostCount;
+        uint256 threadId;
+        uint256 replyToNoteId;
+        address[] mentions;
     }
 
     struct Reply {
@@ -40,6 +43,10 @@ contract NoteBoard {
         uint256 followingCount;
         bool exists;
         bool isPremium;
+        bool isVerified;
+        uint256 joinDate;
+        uint256 lastActive;
+        uint256 streakDays;
     }
 
     struct Reaction {
@@ -68,12 +75,41 @@ contract NoteBoard {
     mapping(string => uint256[]) private taggedNotes;
     mapping(uint256 => uint256) public originalNoteId;
     
+    // Advanced features
+    mapping(address => mapping(address => bool)) public blocked;
+    mapping(address => mapping(address => bool)) public muted;
+    mapping(uint256 => uint256) public reportCount;
+    mapping(uint256 => mapping(address => bool)) public hasReported;
+    mapping(uint256 => uint256[]) public noteThreads;
+    mapping(address => uint256[]) public userMentions;
+    mapping(address => string[]) public userBadges;
+    
+    address public owner;
+    mapping(address => bool) public moderators;
+    
     uint256 public constant MAX_MESSAGE_LENGTH = 280;
     uint256 public constant MAX_USERNAME_LENGTH = 30;
     uint256 public constant MAX_BIO_LENGTH = 160;
     uint256 public constant MAX_TAGS = 5;
     uint256 public constant MAX_PINNED = 3;
+    uint256 public constant REPORT_THRESHOLD = 10;
     uint256 public totalUsers;
+    uint256 public threadCount;
+
+    constructor() {
+        owner = msg.sender;
+        moderators[msg.sender] = true;
+    }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "Not owner");
+        _;
+    }
+
+    modifier onlyModerator() {
+        require(moderators[msg.sender], "Not moderator");
+        _;
+    }
 
     event NotePosted(
         uint256 indexed noteId,
@@ -168,6 +204,16 @@ contract NoteBoard {
         address indexed reposter
     );
 
+    event UserBlocked(address indexed blocker, address indexed blocked);
+    event UserUnblocked(address indexed blocker, address indexed unblocked);
+    event UserMuted(address indexed muter, address indexed muted);
+    event UserUnmuted(address indexed muter, address indexed unmuted);
+    event NoteReported(uint256 indexed noteId, address indexed reporter);
+    event UserVerified(address indexed user);
+    event BadgeAwarded(address indexed user, string badge);
+    event ModeratorAdded(address indexed moderator);
+    event ModeratorRemoved(address indexed moderator);
+
     /**
      * @dev Set username for the caller
      * @param _username The username to set
@@ -181,10 +227,13 @@ contract NoteBoard {
 
         if (!userProfiles[msg.sender].exists) {
             totalUsers++;
+            userProfiles[msg.sender].joinDate = block.timestamp;
         }
 
         userProfiles[msg.sender].username = _username;
         userProfiles[msg.sender].exists = true;
+        userProfiles[msg.sender].lastActive = block.timestamp;
+        _updateStreak(msg.sender);
 
         emit UsernameSet(msg.sender, _username);
     }
@@ -225,11 +274,17 @@ contract NoteBoard {
      * @param _message The message content (max 280 characters)
      * @param _tags Array of tags for the note
      * @param _ipfsHash IPFS hash for attached media (optional)
+     * @param _threadId Thread ID (0 for new thread)
+     * @param _replyToNoteId Note ID being replied to (0 if not a reply)
+     * @param _mentions Array of addresses mentioned
      */
     function postNote(
         string calldata _message, 
         string[] calldata _tags,
-        string calldata _ipfsHash
+        string calldata _ipfsHash,
+        uint256 _threadId,
+        uint256 _replyToNoteId,
+        address[] calldata _mentions
     ) external {
         require(bytes(_message).length > 0, "Message cannot be empty");
         require(
@@ -239,6 +294,12 @@ contract NoteBoard {
         require(_tags.length <= MAX_TAGS, "Too many tags");
 
         uint256 noteId = notes.length;
+        uint256 threadId = _threadId;
+        
+        // Create new thread if not specified
+        if (threadId == 0) {
+            threadId = threadCount++;
+        }
         
         Note storage newNote = notes.push();
         newNote.author = msg.sender;
@@ -253,19 +314,31 @@ contract NoteBoard {
         newNote.ipfsHash = _ipfsHash;
         newNote.tipAmount = 0;
         newNote.repostCount = 0;
+        newNote.threadId = threadId;
+        newNote.replyToNoteId = _replyToNoteId;
+        newNote.mentions = _mentions;
 
         userNotes[msg.sender].push(noteId);
+        noteThreads[threadId].push(noteId);
         
         // Add to tagged notes
         for (uint256 i = 0; i < _tags.length; i++) {
             taggedNotes[_tags[i]].push(noteId);
         }
         
+        // Track mentions
+        for (uint256 i = 0; i < _mentions.length; i++) {
+            userMentions[_mentions[i]].push(noteId);
+        }
+        
         if (!userProfiles[msg.sender].exists) {
             userProfiles[msg.sender].exists = true;
+            userProfiles[msg.sender].joinDate = block.timestamp;
             totalUsers++;
         }
         userProfiles[msg.sender].totalNotes++;
+        userProfiles[msg.sender].lastActive = block.timestamp;
+        _updateStreak(msg.sender);
 
         emit NotePosted(noteId, msg.sender, _message, block.timestamp);
     }
@@ -557,10 +630,172 @@ contract NoteBoard {
 
         if (!userProfiles[msg.sender].exists) {
             userProfiles[msg.sender].exists = true;
+            userProfiles[msg.sender].joinDate = block.timestamp;
             totalUsers++;
         }
 
         userProfiles[msg.sender].isPremium = true;
+        _awardBadge(msg.sender, "Premium Member");
+    }
+
+    /**
+     * @dev Block a user
+     * @param _user The address to block
+     */
+    function blockUser(address _user) external {
+        require(_user != msg.sender, "Cannot block yourself");
+        require(!blocked[msg.sender][_user], "Already blocked");
+
+        blocked[msg.sender][_user] = true;
+        
+        // Unfollow if following
+        if (following[msg.sender][_user]) {
+            following[msg.sender][_user] = false;
+            if (userProfiles[_user].followersCount > 0) {
+                userProfiles[_user].followersCount--;
+            }
+            if (userProfiles[msg.sender].followingCount > 0) {
+                userProfiles[msg.sender].followingCount--;
+            }
+        }
+
+        emit UserBlocked(msg.sender, _user);
+    }
+
+    /**
+     * @dev Unblock a user
+     * @param _user The address to unblock
+     */
+    function unblockUser(address _user) external {
+        require(blocked[msg.sender][_user], "Not blocked");
+
+        blocked[msg.sender][_user] = false;
+
+        emit UserUnblocked(msg.sender, _user);
+    }
+
+    /**
+     * @dev Mute a user
+     * @param _user The address to mute
+     */
+    function muteUser(address _user) external {
+        require(_user != msg.sender, "Cannot mute yourself");
+        require(!muted[msg.sender][_user], "Already muted");
+
+        muted[msg.sender][_user] = true;
+
+        emit UserMuted(msg.sender, _user);
+    }
+
+    /**
+     * @dev Unmute a user
+     * @param _user The address to unmute
+     */
+    function unmuteUser(address _user) external {
+        require(muted[msg.sender][_user], "Not muted");
+
+        muted[msg.sender][_user] = false;
+
+        emit UserUnmuted(msg.sender, _user);
+    }
+
+    /**
+     * @dev Report a note
+     * @param _noteId The ID of the note to report
+     */
+    function reportNote(uint256 _noteId) external {
+        require(_noteId < notes.length, "Note does not exist");
+        require(!hasReported[_noteId][msg.sender], "Already reported");
+
+        hasReported[_noteId][msg.sender] = true;
+        reportCount[_noteId]++;
+
+        emit NoteReported(_noteId, msg.sender);
+
+        // Auto-delete if threshold reached
+        if (reportCount[_noteId] >= REPORT_THRESHOLD && !notes[_noteId].isDeleted) {
+            notes[_noteId].isDeleted = true;
+        }
+    }
+
+    /**
+     * @dev Verify a user (moderator only)
+     * @param _user The address to verify
+     */
+    function verifyUser(address _user) external onlyModerator {
+        require(userProfiles[_user].exists, "User does not exist");
+        require(!userProfiles[_user].isVerified, "Already verified");
+
+        userProfiles[_user].isVerified = true;
+        _awardBadge(_user, "Verified");
+
+        emit UserVerified(_user);
+    }
+
+    /**
+     * @dev Add a moderator (owner only)
+     * @param _moderator The address to add as moderator
+     */
+    function addModerator(address _moderator) external onlyOwner {
+        require(!moderators[_moderator], "Already a moderator");
+
+        moderators[_moderator] = true;
+
+        emit ModeratorAdded(_moderator);
+    }
+
+    /**
+     * @dev Remove a moderator (owner only)
+     * @param _moderator The address to remove from moderators
+     */
+    function removeModerator(address _moderator) external onlyOwner {
+        require(moderators[_moderator], "Not a moderator");
+        require(_moderator != owner, "Cannot remove owner");
+
+        moderators[_moderator] = false;
+
+        emit ModeratorRemoved(_moderator);
+    }
+
+    /**
+     * @dev Award a badge to a user
+     * @param _user The address of the user
+     * @param _badge The badge name
+     */
+    function _awardBadge(address _user, string memory _badge) private {
+        userBadges[_user].push(_badge);
+        emit BadgeAwarded(_user, _badge);
+    }
+
+    /**
+     * @dev Update user activity streak
+     * @param _user The address of the user
+     */
+    function _updateStreak(address _user) private {
+        uint256 lastActive = userProfiles[_user].lastActive;
+        
+        if (lastActive > 0) {
+            uint256 daysSinceActive = (block.timestamp - lastActive) / 1 days;
+            
+            if (daysSinceActive == 1) {
+                // Consecutive day
+                userProfiles[_user].streakDays++;
+                
+                // Award badges for streaks
+                if (userProfiles[_user].streakDays == 7) {
+                    _awardBadge(_user, "7-Day Streak");
+                } else if (userProfiles[_user].streakDays == 30) {
+                    _awardBadge(_user, "30-Day Streak");
+                } else if (userProfiles[_user].streakDays == 100) {
+                    _awardBadge(_user, "100-Day Streak");
+                }
+            } else if (daysSinceActive > 1) {
+                // Streak broken
+                userProfiles[_user].streakDays = 1;
+            }
+        } else {
+            userProfiles[_user].streakDays = 1;
+        }
     }
 
     /**
@@ -955,6 +1190,87 @@ contract NoteBoard {
         }
 
         return recent;
+    }
+
+    /**
+     * @dev Check if user is blocked
+     * @param _blocker The blocker address
+     * @param _blocked The blocked address
+     * @return True if blocked, false otherwise
+     */
+    function isBlocked(address _blocker, address _blocked) external view returns (bool) {
+        return blocked[_blocker][_blocked];
+    }
+
+    /**
+     * @dev Check if user is muted
+     * @param _muter The muter address
+     * @param _muted The muted address
+     * @return True if muted, false otherwise
+     */
+    function isMuted(address _muter, address _muted) external view returns (bool) {
+        return muted[_muter][_muted];
+    }
+
+    /**
+     * @dev Get notes in a thread
+     * @param _threadId The thread ID
+     * @return Array of notes in the thread
+     */
+    function getThreadNotes(uint256 _threadId) external view returns (Note[] memory) {
+        uint256[] memory noteIds = noteThreads[_threadId];
+        Note[] memory threadNotes = new Note[](noteIds.length);
+        
+        for (uint256 i = 0; i < noteIds.length; i++) {
+            threadNotes[i] = notes[noteIds[i]];
+        }
+        
+        return threadNotes;
+    }
+
+    /**
+     * @dev Get notes where user is mentioned
+     * @param _user The address of the user
+     * @return Array of note IDs where user is mentioned
+     */
+    function getUserMentions(address _user) external view returns (uint256[] memory) {
+        return userMentions[_user];
+    }
+
+    /**
+     * @dev Get user's badges
+     * @param _user The address of the user
+     * @return Array of badge names
+     */
+    function getUserBadges(address _user) external view returns (string[] memory) {
+        return userBadges[_user];
+    }
+
+    /**
+     * @dev Get report count for a note
+     * @param _noteId The ID of the note
+     * @return Number of reports
+     */
+    function getReportCount(uint256 _noteId) external view returns (uint256) {
+        require(_noteId < notes.length, "Note does not exist");
+        return reportCount[_noteId];
+    }
+
+    /**
+     * @dev Check if user is a moderator
+     * @param _user The address to check
+     * @return True if moderator, false otherwise
+     */
+    function isModerator(address _user) external view returns (bool) {
+        return moderators[_user];
+    }
+
+    /**
+     * @dev Get contract owner
+     * @return Owner address
+     */
+    function getOwner() external view returns (address) {
+        return owner;
     }
 }
 
