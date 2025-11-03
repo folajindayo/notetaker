@@ -70,10 +70,15 @@ A comprehensive decentralized social media platform built on Base blockchain wit
 ## 🎨 Pages
 
 - `/` - Home feed with all notes
-- `/profile/[address]` - User profile pages
-- `/communities` - Browse and create communities
-- `/leaderboard` - Top users rankings
-- `/rewards` - Rewards dashboard
+- `/profile/[address]` - User profile pages with stats, badges, and activity
+- `/communities` - Browse and create public/private communities
+- `/leaderboard` - Top users rankings with point system
+- `/rewards` - Rewards dashboard with point claiming
+- `/trending` - Trending notes and popular content
+- `/search` - Full-text search for notes, users, and tags
+- `/bookmarks` - Saved notes collection
+- `/settings` - Account settings and profile customization
+- `/analytics` - Platform statistics and insights
 
 ## 🛠️ Tech Stack
 
@@ -185,13 +190,14 @@ notetaker/
 │   └── globals.css            # Global styles
 ├── components/                 # React components
 │   ├── BottomToolbar.tsx      # Action toolbar
-│   ├── CreatePollModal.tsx    # Poll creation
+│   ├── CreatePollModal.tsx    # Poll creation modal
 │   ├── MainContent.tsx        # Main content area
-│   ├── NoteFeed.tsx          # Notes display
+│   ├── NoteCard.tsx          # Interactive note card with actions
+│   ├── NoteFeed.tsx          # Notes feed display
 │   ├── PollCard.tsx          # Poll voting UI
-│   ├── PostNoteModal.tsx     # Note creation
-│   ├── Sidebar.tsx           # Navigation
-│   └── WalletConnect.tsx     # Wallet UI
+│   ├── PostNoteModal.tsx     # Note creation modal
+│   ├── Sidebar.tsx           # Navigation sidebar
+│   └── WalletConnect.tsx     # Wallet connection UI
 ├── contracts/                 # Solidity contracts
 │   └── NoteBoard.sol         # Main contract (1700+ lines)
 ├── lib/                      # Utilities
@@ -305,31 +311,69 @@ npx hardhat test
 
 ## 🎨 Component Highlights
 
+### NoteCard
+Interactive note cards featuring:
+- Like, reply, repost, bookmark actions
+- User avatar and profile links
+- Tag display with click navigation
+- More actions menu (edit, delete, report)
+- Real-time interaction counts
+- Smooth animations and transitions
+
 ### NoteFeed
-Real-time updating feed with auto-refresh on new blocks and event-based updates.
+Real-time updating feed with:
+- Auto-refresh on new blocks
+- Event-based updates
+- Reverse chronological order
+- Loading states
 
 ### PostNoteModal
 Rich note creation with:
-- Character counter
-- Tag input
+- Character counter (280 max)
+- Tag input (up to 5 tags)
 - IPFS media attachment
 - Poll creation option
-- Mention support
+- Mention support (@addresses)
 
 ### PollCard
 Interactive poll voting with:
 - Real-time vote percentages
 - Visual progress bars
-- Vote submission
+- Vote submission handling
 - Time remaining display
+- Results visualization
 
 ### Profile Page
 Complete user profiles showing:
 - Stats (notes, followers, streak)
-- Badges collection
-- Pinned notes
-- Activity feed
+- Badge collection display
+- Pinned notes section
+- Activity feed tabs
 - Follow/subscribe buttons
+- Reward points
+
+### Search Page
+Advanced search functionality:
+- Full-text search in notes
+- Filter by type (all, notes, users, tags)
+- Real-time results
+- Highlighted matches
+
+### Trending Page
+Discover popular content:
+- Trending notes algorithm
+- Time period filters (1h, 24h, 7d)
+- Category filters
+- Ranked display with medals
+- Engagement metrics
+
+### Settings Page
+Comprehensive settings:
+- Profile customization (username, bio)
+- Monetization setup (subscription pricing)
+- Premium account upgrade
+- Tab-based navigation
+- Privacy settings (coming soon)
 
 ## 🔧 Troubleshooting
 
