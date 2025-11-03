@@ -54,8 +54,35 @@ contract NoteBoard {
         uint256 count;
     }
 
+    struct Poll {
+        uint256 noteId;
+        string[] options;
+        uint256[] votes;
+        uint256 endTime;
+        bool isActive;
+    }
+
+    struct Community {
+        string name;
+        string description;
+        address creator;
+        uint256 memberCount;
+        uint256 createdAt;
+        bool isPrivate;
+        uint256 subscriptionFee;
+    }
+
+    struct Subscription {
+        address subscriber;
+        address creator;
+        uint256 expiresAt;
+        bool isActive;
+    }
+
     Note[] private notes;
     Reply[] private replies;
+    Poll[] private polls;
+    Community[] private communities;
     
     // Existing mappings
     mapping(uint256 => mapping(address => bool)) public noteLikes;
@@ -84,8 +111,32 @@ contract NoteBoard {
     mapping(address => uint256[]) public userMentions;
     mapping(address => string[]) public userBadges;
     
+    // Polls
+    mapping(uint256 => uint256) public noteToPoll;
+    mapping(uint256 => mapping(address => bool)) public hasVoted;
+    mapping(uint256 => mapping(address => uint256)) public userVote;
+    
+    // Communities
+    mapping(uint256 => mapping(address => bool)) public communityMembers;
+    mapping(uint256 => address[]) private communityMemberList;
+    mapping(uint256 => uint256[]) private communityNotes;
+    
+    // Subscriptions
+    mapping(address => mapping(address => Subscription)) public subscriptions;
+    mapping(address => address[]) private subscribers;
+    mapping(address => uint256) public subscriptionPrice;
+    
+    // Engagement rewards
+    mapping(address => uint256) public rewardPoints;
+    mapping(address => uint256) public totalEarnings;
+    
+    // NFT Profile Picture
+    mapping(address => address) public profileNFTContract;
+    mapping(address => uint256) public profileNFTTokenId;
+    
     address public owner;
     mapping(address => bool) public moderators;
+    uint256 public platformFee = 100; // 1% (in basis points)
     
     uint256 public constant MAX_MESSAGE_LENGTH = 280;
     uint256 public constant MAX_USERNAME_LENGTH = 30;
@@ -93,6 +144,10 @@ contract NoteBoard {
     uint256 public constant MAX_TAGS = 5;
     uint256 public constant MAX_PINNED = 3;
     uint256 public constant REPORT_THRESHOLD = 10;
+    uint256 public constant MAX_POLL_OPTIONS = 10;
+    uint256 public constant POINTS_PER_NOTE = 10;
+    uint256 public constant POINTS_PER_LIKE_RECEIVED = 5;
+    uint256 public constant POINTS_PER_REPLY = 3;
     uint256 public totalUsers;
     uint256 public threadCount;
 
@@ -213,6 +268,15 @@ contract NoteBoard {
     event BadgeAwarded(address indexed user, string badge);
     event ModeratorAdded(address indexed moderator);
     event ModeratorRemoved(address indexed moderator);
+    event PollCreated(uint256 indexed pollId, uint256 indexed noteId, address indexed creator);
+    event PollVoted(uint256 indexed pollId, address indexed voter, uint256 optionIndex);
+    event CommunityCreated(uint256 indexed communityId, address indexed creator, string name);
+    event CommunityJoined(uint256 indexed communityId, address indexed member);
+    event CommunityLeft(uint256 indexed communityId, address indexed member);
+    event Subscribed(address indexed subscriber, address indexed creator, uint256 expiresAt);
+    event SubscriptionRenewed(address indexed subscriber, address indexed creator, uint256 newExpiry);
+    event RewardsClaimed(address indexed user, uint256 amount);
+    event ProfileNFTSet(address indexed user, address nftContract, uint256 tokenId);
 
     /**
      * @dev Set username for the caller
@@ -339,6 +403,10 @@ contract NoteBoard {
         userProfiles[msg.sender].totalNotes++;
         userProfiles[msg.sender].lastActive = block.timestamp;
         _updateStreak(msg.sender);
+        
+        // Award points for posting
+        rewardPoints[msg.sender] += POINTS_PER_NOTE;
+        _checkMilestones(msg.sender);
 
         emit NotePosted(noteId, msg.sender, _message, block.timestamp);
     }
@@ -355,6 +423,9 @@ contract NoteBoard {
         noteLikes[_noteId][msg.sender] = true;
         notes[_noteId].likes++;
         userProfiles[notes[_noteId].author].totalLikes++;
+        
+        // Award points to note author
+        rewardPoints[notes[_noteId].author] += POINTS_PER_LIKE_RECEIVED;
 
         emit NoteLiked(_noteId, msg.sender, notes[_noteId].likes);
     }
@@ -441,6 +512,9 @@ contract NoteBoard {
 
         noteReplies[_noteId].push(replyId);
         notes[_noteId].replyCount++;
+        
+        // Award points for replying
+        rewardPoints[msg.sender] += POINTS_PER_REPLY;
 
         emit ReplyPosted(replyId, _noteId, msg.sender, _message, block.timestamp);
     }
@@ -755,6 +829,220 @@ contract NoteBoard {
         moderators[_moderator] = false;
 
         emit ModeratorRemoved(_moderator);
+    }
+
+    /**
+     * @dev Create a poll attached to a note
+     * @param _noteId The note ID to attach poll to
+     * @param _options Array of poll options
+     * @param _duration Duration in seconds
+     */
+    function createPoll(uint256 _noteId, string[] calldata _options, uint256 _duration) external {
+        require(_noteId < notes.length, "Note does not exist");
+        require(notes[_noteId].author == msg.sender, "Not the author");
+        require(_options.length >= 2 && _options.length <= MAX_POLL_OPTIONS, "Invalid options count");
+        require(_duration > 0, "Invalid duration");
+
+        uint256 pollId = polls.length;
+        uint256[] memory votes = new uint256[](_options.length);
+        
+        polls.push(Poll({
+            noteId: _noteId,
+            options: _options,
+            votes: votes,
+            endTime: block.timestamp + _duration,
+            isActive: true
+        }));
+
+        noteToPoll[_noteId] = pollId;
+
+        emit PollCreated(pollId, _noteId, msg.sender);
+    }
+
+    /**
+     * @dev Vote on a poll
+     * @param _pollId The poll ID
+     * @param _optionIndex The option to vote for
+     */
+    function voteOnPoll(uint256 _pollId, uint256 _optionIndex) external {
+        require(_pollId < polls.length, "Poll does not exist");
+        require(polls[_pollId].isActive, "Poll not active");
+        require(block.timestamp < polls[_pollId].endTime, "Poll ended");
+        require(_optionIndex < polls[_pollId].options.length, "Invalid option");
+        require(!hasVoted[_pollId][msg.sender], "Already voted");
+
+        hasVoted[_pollId][msg.sender] = true;
+        userVote[_pollId][msg.sender] = _optionIndex;
+        polls[_pollId].votes[_optionIndex]++;
+
+        emit PollVoted(_pollId, msg.sender, _optionIndex);
+    }
+
+    /**
+     * @dev Create a community
+     * @param _name Community name
+     * @param _description Community description
+     * @param _isPrivate Whether community is private
+     * @param _subscriptionFee Fee to join (0 for free)
+     */
+    function createCommunity(
+        string calldata _name,
+        string calldata _description,
+        bool _isPrivate,
+        uint256 _subscriptionFee
+    ) external {
+        uint256 communityId = communities.length;
+        
+        communities.push(Community({
+            name: _name,
+            description: _description,
+            creator: msg.sender,
+            memberCount: 1,
+            createdAt: block.timestamp,
+            isPrivate: _isPrivate,
+            subscriptionFee: _subscriptionFee
+        }));
+
+        communityMembers[communityId][msg.sender] = true;
+        communityMemberList[communityId].push(msg.sender);
+
+        emit CommunityCreated(communityId, msg.sender, _name);
+    }
+
+    /**
+     * @dev Join a community
+     * @param _communityId The community ID
+     */
+    function joinCommunity(uint256 _communityId) external payable {
+        require(_communityId < communities.length, "Community does not exist");
+        require(!communityMembers[_communityId][msg.sender], "Already a member");
+        require(msg.value >= communities[_communityId].subscriptionFee, "Insufficient fee");
+
+        communityMembers[_communityId][msg.sender] = true;
+        communityMemberList[_communityId].push(msg.sender);
+        communities[_communityId].memberCount++;
+
+        // Transfer fee to creator
+        if (msg.value > 0) {
+            uint256 fee = (msg.value * platformFee) / 10000;
+            uint256 creatorAmount = msg.value - fee;
+            payable(communities[_communityId].creator).transfer(creatorAmount);
+        }
+
+        emit CommunityJoined(_communityId, msg.sender);
+    }
+
+    /**
+     * @dev Leave a community
+     * @param _communityId The community ID
+     */
+    function leaveCommunity(uint256 _communityId) external {
+        require(_communityId < communities.length, "Community does not exist");
+        require(communityMembers[_communityId][msg.sender], "Not a member");
+        require(communities[_communityId].creator != msg.sender, "Creator cannot leave");
+
+        communityMembers[_communityId][msg.sender] = false;
+        if (communities[_communityId].memberCount > 0) {
+            communities[_communityId].memberCount--;
+        }
+
+        emit CommunityLeft(_communityId, msg.sender);
+    }
+
+    /**
+     * @dev Subscribe to a creator
+     * @param _creator The creator address
+     * @param _duration Duration in seconds
+     */
+    function subscribe(address _creator, uint256 _duration) external payable {
+        require(_creator != msg.sender, "Cannot subscribe to yourself");
+        require(subscriptionPrice[_creator] > 0, "Creator not accepting subscriptions");
+        require(msg.value >= subscriptionPrice[_creator], "Insufficient payment");
+
+        uint256 expiresAt = block.timestamp + _duration;
+        
+        subscriptions[msg.sender][_creator] = Subscription({
+            subscriber: msg.sender,
+            creator: _creator,
+            expiresAt: expiresAt,
+            isActive: true
+        });
+
+        subscribers[_creator].push(msg.sender);
+
+        // Transfer subscription fee
+        uint256 fee = (msg.value * platformFee) / 10000;
+        uint256 creatorAmount = msg.value - fee;
+        totalEarnings[_creator] += creatorAmount;
+        payable(_creator).transfer(creatorAmount);
+
+        emit Subscribed(msg.sender, _creator, expiresAt);
+    }
+
+    /**
+     * @dev Set subscription price
+     * @param _price Price per month in wei
+     */
+    function setSubscriptionPrice(uint256 _price) external {
+        subscriptionPrice[msg.sender] = _price;
+    }
+
+    /**
+     * @dev Claim reward points (convert to ETH if available)
+     * @param _amount Amount of points to claim
+     */
+    function claimRewards(uint256 _amount) external {
+        require(rewardPoints[msg.sender] >= _amount, "Insufficient points");
+        
+        rewardPoints[msg.sender] -= _amount;
+        
+        // Convert points to ETH (if contract has balance)
+        uint256 ethAmount = (_amount * 1 ether) / 100000; // Example conversion rate
+        
+        if (address(this).balance >= ethAmount) {
+            payable(msg.sender).transfer(ethAmount);
+            emit RewardsClaimed(msg.sender, ethAmount);
+        }
+    }
+
+    /**
+     * @dev Set NFT as profile picture
+     * @param _nftContract NFT contract address
+     * @param _tokenId Token ID
+     */
+    function setProfileNFT(address _nftContract, uint256 _tokenId) external {
+        // In production, verify ownership via ERC721 interface
+        profileNFTContract[msg.sender] = _nftContract;
+        profileNFTTokenId[msg.sender] = _tokenId;
+
+        emit ProfileNFTSet(msg.sender, _nftContract, _tokenId);
+    }
+
+    /**
+     * @dev Withdraw platform fees (owner only)
+     */
+    function withdrawFees() external onlyOwner {
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No fees to withdraw");
+        payable(owner).transfer(balance);
+    }
+
+    /**
+     * @dev Check milestones and award badges
+     * @param _user The user address
+     */
+    function _checkMilestones(address _user) private {
+        uint256 notes = userProfiles[_user].totalNotes;
+        uint256 likes = userProfiles[_user].totalLikes;
+        
+        if (notes == 1) _awardBadge(_user, "First Note");
+        if (notes == 10) _awardBadge(_user, "10 Notes");
+        if (notes == 100) _awardBadge(_user, "Century");
+        if (notes == 1000) _awardBadge(_user, "Prolific Writer");
+        
+        if (likes == 100) _awardBadge(_user, "100 Likes");
+        if (likes == 1000) _awardBadge(_user, "1K Likes");
+        if (likes == 10000) _awardBadge(_user, "10K Likes");
     }
 
     /**
@@ -1272,5 +1560,141 @@ contract NoteBoard {
     function getOwner() external view returns (address) {
         return owner;
     }
+
+    /**
+     * @dev Get poll details
+     * @param _pollId The poll ID
+     * @return Poll data
+     */
+    function getPoll(uint256 _pollId) external view returns (Poll memory) {
+        require(_pollId < polls.length, "Poll does not exist");
+        return polls[_pollId];
+    }
+
+    /**
+     * @dev Get poll for a note
+     * @param _noteId The note ID
+     * @return Poll ID (0 if no poll)
+     */
+    function getPollForNote(uint256 _noteId) external view returns (uint256) {
+        return noteToPoll[_noteId];
+    }
+
+    /**
+     * @dev Check if user voted on poll
+     * @param _pollId The poll ID
+     * @param _user The user address
+     * @return True if voted
+     */
+    function hasUserVoted(uint256 _pollId, address _user) external view returns (bool) {
+        return hasVoted[_pollId][_user];
+    }
+
+    /**
+     * @dev Get community details
+     * @param _communityId The community ID
+     * @return Community data
+     */
+    function getCommunity(uint256 _communityId) external view returns (Community memory) {
+        require(_communityId < communities.length, "Community does not exist");
+        return communities[_communityId];
+    }
+
+    /**
+     * @dev Get all communities
+     * @return Array of communities
+     */
+    function getAllCommunities() external view returns (Community[] memory) {
+        return communities;
+    }
+
+    /**
+     * @dev Check if user is community member
+     * @param _communityId The community ID
+     * @param _user The user address
+     * @return True if member
+     */
+    function isCommunityMember(uint256 _communityId, address _user) external view returns (bool) {
+        return communityMembers[_communityId][_user];
+    }
+
+    /**
+     * @dev Get community members
+     * @param _communityId The community ID
+     * @return Array of member addresses
+     */
+    function getCommunityMembers(uint256 _communityId) external view returns (address[] memory) {
+        require(_communityId < communities.length, "Community does not exist");
+        return communityMemberList[_communityId];
+    }
+
+    /**
+     * @dev Check if user is subscribed to creator
+     * @param _subscriber The subscriber address
+     * @param _creator The creator address
+     * @return True if active subscription
+     */
+    function isSubscribed(address _subscriber, address _creator) external view returns (bool) {
+        Subscription memory sub = subscriptions[_subscriber][_creator];
+        return sub.isActive && sub.expiresAt > block.timestamp;
+    }
+
+    /**
+     * @dev Get subscriber list for creator
+     * @param _creator The creator address
+     * @return Array of subscriber addresses
+     */
+    function getSubscribers(address _creator) external view returns (address[] memory) {
+        return subscribers[_creator];
+    }
+
+    /**
+     * @dev Get user's reward points
+     * @param _user The user address
+     * @return Points balance
+     */
+    function getRewardPoints(address _user) external view returns (uint256) {
+        return rewardPoints[_user];
+    }
+
+    /**
+     * @dev Get user's total earnings
+     * @param _user The user address
+     * @return Total earnings in wei
+     */
+    function getTotalEarnings(address _user) external view returns (uint256) {
+        return totalEarnings[_user];
+    }
+
+    /**
+     * @dev Get user's profile NFT
+     * @param _user The user address
+     * @return NFT contract and token ID
+     */
+    function getProfileNFT(address _user) external view returns (address, uint256) {
+        return (profileNFTContract[_user], profileNFTTokenId[_user]);
+    }
+
+    /**
+     * @dev Get leaderboard (top users by points)
+     * @param _limit Number of users to return
+     * @return Arrays of addresses and points
+     */
+    function getLeaderboard(uint256 _limit) external view returns (address[] memory, uint256[] memory) {
+        // This is a simplified version - in production, consider using subgraph
+        uint256 limit = _limit > totalUsers ? totalUsers : _limit;
+        address[] memory topUsers = new address[](limit);
+        uint256[] memory topPoints = new uint256[](limit);
+        
+        // Note: This is gas-intensive for large user bases
+        // Better to track separately or use off-chain indexing
+        
+        return (topUsers, topPoints);
+    }
+
+    /**
+     * @dev Fallback to receive ETH
+     */
+    receive() external payable {}
 }
 
