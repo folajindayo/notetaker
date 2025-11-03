@@ -67,7 +67,7 @@ A comprehensive decentralized social media platform built on Base blockchain wit
 - User verification system
 - Content flagging
 
-## 🎨 Pages
+## 🎨 Pages (20+)
 
 - `/` - Home feed with all notes
 - `/profile/[address]` - User profile pages with stats, badges, and activity
@@ -79,6 +79,13 @@ A comprehensive decentralized social media platform built on Base blockchain wit
 - `/bookmarks` - Saved notes collection
 - `/settings` - Account settings and profile customization
 - `/analytics` - Platform statistics and insights
+- `/notifications` - Notification center with filtering
+- `/following` - Following/followers management
+- `/explore` - Content discovery hub
+- `/tags/[tag]` - Tag-based content pages
+- `/admin` - Admin/moderator dashboard
+- `/help` - Comprehensive help center
+- `/about` - About/landing page
 
 ## 🛠️ Tech Stack
 
