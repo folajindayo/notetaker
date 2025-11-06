@@ -8,6 +8,7 @@ import { usePathname } from "next/navigation";
 export function Sidebar() {
   const pathname = usePathname();
   const { isConnected, address } = useAccount();
+  const [activeItem, setActiveItem] = useState("base-sepolia");
 
   return (
     <aside className="w-[280px] flex-shrink-0 flex flex-col border-r border-gray-200 bg-gray-50">
