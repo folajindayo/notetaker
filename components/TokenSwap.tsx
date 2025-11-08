@@ -1,558 +1,428 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
-import { useAccount, useBalance } from 'wagmi';
-import { useTranslation } from '@/lib/i18n';
+import { useAccount } from 'wagmi';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Badge } from './ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { ArrowDownUp, TrendingUp, Info, AlertCircle, RefreshCw, CheckCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Separator } from './ui/separator';
+import { format } from 'date-fns';
 
 interface Token {
-  address: string;
   symbol: string;
   name: string;
+  address: string;
   decimals: number;
-  logoURI: string;
-  balance?: string;
-  price?: number;
+  balance: string;
+  price: number; // USD price
+  logo?: string;
 }
 
-interface SwapRoute {
-  dex: string;
-  icon: string;
-  outputAmount: string;
-  priceImpact: number;
-  gasEstimate: string;
-  path: string[];
-}
-
-interface SwapHistory {
+interface SwapTransaction {
   id: string;
   fromToken: string;
   toToken: string;
   fromAmount: string;
   toAmount: string;
-  price: string;
-  timestamp: number;
-  txHash: string;
-  status: 'completed' | 'pending' | 'failed';
+  rate: number;
+  timestamp: string;
+  status: 'pending' | 'completed' | 'failed';
+  txHash?: string;
 }
 
-export default function TokenSwap() {
+const availableTokens: Token[] = [
+  { symbol: 'ETH', name: 'Ethereum', address: '0x0000000000000000000000000000000000000000', decimals: 18, balance: '1.5', price: 2500 },
+  { symbol: 'USDC', name: 'USD Coin', address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', decimals: 6, balance: '5000', price: 1 },
+  { symbol: 'NOTE', name: 'NoteBoard Token', address: '0x1234567890123456789012345678901234567890', decimals: 18, balance: '10000', price: 0.5 },
+  { symbol: 'USDT', name: 'Tether USD', address: '0xdAC17F958D2ee523a2206206994597C13D831ec7', decimals: 6, balance: '2000', price: 1 },
+];
+
+const mockSwapHistory: SwapTransaction[] = [
+  {
+    id: 'swap_001',
+    fromToken: 'ETH',
+    toToken: 'USDC',
+    fromAmount: '0.1',
+    toAmount: '250',
+    rate: 2500,
+    timestamp: '2024-07-22T14:30:00Z',
+    status: 'completed',
+    txHash: '0xabc123...',
+  },
+  {
+    id: 'swap_002',
+    fromToken: 'NOTE',
+    toToken: 'ETH',
+    fromAmount: '1000',
+    toAmount: '0.5',
+    rate: 0.0005,
+    timestamp: '2024-07-21T10:00:00Z',
+    status: 'completed',
+    txHash: '0xdef456...',
+  },
+];
+
+const TokenSwap: React.FC = () => {
   const { address, isConnected } = useAccount();
-  const { data: ethBalance } = useBalance({ address });
-  const { t } = useTranslation();
-  
-  const [tokens, setTokens] = useState<Token[]>([]);
-  const [fromToken, setFromToken] = useState<Token | null>(null);
-  const [toToken, setToToken] = useState<Token | null>(null);
+  const [fromToken, setFromToken] = useState<string>('ETH');
+  const [toToken, setToToken] = useState<string>('USDC');
   const [fromAmount, setFromAmount] = useState('');
   const [toAmount, setToAmount] = useState('');
-  const [routes, setRoutes] = useState<SwapRoute[]>([]);
-  const [selectedRoute, setSelectedRoute] = useState<SwapRoute | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [swapping, setSwapping] = useState(false);
-  const [showTokenSelector, setShowTokenSelector] = useState<'from' | 'to' | null>(null);
+  const [swapHistory, setSwapHistory] = useState<SwapTransaction[]>(mockSwapHistory);
+  const [isSwapping, setIsSwapping] = useState(false);
   const [slippage, setSlippage] = useState('0.5');
-  const [history, setHistory] = useState<SwapHistory[]>([]);
-  const [showSettings, setShowSettings] = useState(false);
+  const [exchangeRate, setExchangeRate] = useState(0);
+  const [priceImpact, setPriceImpact] = useState(0);
 
   useEffect(() => {
-    const loadTokens = async () => {
-      setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      const mockTokens: Token[] = [
-        {
-          address: '0x0000000000000000000000000000000000000000',
-          symbol: 'ETH',
-          name: 'Ethereum',
-          decimals: 18,
-          logoURI: '⚡',
-          balance: ethBalance?.formatted || '0',
-          price: 2000,
-        },
-        {
-          address: '0x1234567890123456789012345678901234567890',
-          symbol: 'NOTE',
-          name: 'NoteBoard Token',
-          decimals: 18,
-          logoURI: '📝',
-          balance: '5000',
-          price: 0.25,
-        },
-        {
-          address: '0x2345678901234567890123456789012345678901',
-          symbol: 'USDC',
-          name: 'USD Coin',
-          decimals: 6,
-          logoURI: '💵',
-          balance: '1000',
-          price: 1,
-        },
-        {
-          address: '0x3456789012345678901234567890123456789012',
-          symbol: 'DAI',
-          name: 'Dai Stablecoin',
-          decimals: 18,
-          logoURI: '💰',
-          balance: '500',
-          price: 1,
-        },
-        {
-          address: '0x4567890123456789012345678901234567890123',
-          symbol: 'WBTC',
-          name: 'Wrapped Bitcoin',
-          decimals: 8,
-          logoURI: '₿',
-          balance: '0.05',
-          price: 45000,
-        },
-      ];
-
-      const mockHistory: SwapHistory[] = [
-        {
-          id: '1',
-          fromToken: 'ETH',
-          toToken: 'NOTE',
-          fromAmount: '0.5',
-          toAmount: '4000',
-          price: '8000',
-          timestamp: Date.now() - 3600000,
-          txHash: '0xabc123...',
-          status: 'completed',
-        },
-        {
-          id: '2',
-          fromToken: 'NOTE',
-          toToken: 'USDC',
-          fromAmount: '1000',
-          toAmount: '250',
-          price: '0.25',
-          timestamp: Date.now() - 7200000,
-          txHash: '0xdef456...',
-          status: 'completed',
-        },
-      ];
-
-      setTokens(mockTokens);
-      setFromToken(mockTokens[0]);
-      setToToken(mockTokens[1]);
-      setHistory(mockHistory);
-      setLoading(false);
-    };
-
-    if (address) {
-      loadTokens();
+    if (fromToken && toToken && fromAmount) {
+      calculateSwap();
     }
-  }, [address, ethBalance]);
+  }, [fromToken, toToken, fromAmount]);
 
-  useEffect(() => {
-    if (fromAmount && fromToken && toToken) {
-      findBestRoutes();
+  const calculateSwap = () => {
+    const from = availableTokens.find(t => t.symbol === fromToken);
+    const to = availableTokens.find(t => t.symbol === toToken);
+    
+    if (from && to && fromAmount) {
+      const amount = parseFloat(fromAmount);
+      const rate = to.price / from.price;
+      const calculatedAmount = amount * rate;
+      setExchangeRate(rate);
+      setToAmount(calculatedAmount.toFixed(6));
+      
+      // Calculate price impact (simplified)
+      const impact = amount > 10 ? 0.1 : amount > 1 ? 0.5 : 1.0;
+      setPriceImpact(impact);
     }
-  }, [fromAmount, fromToken, toToken]);
-
-  const findBestRoutes = async () => {
-    if (!fromAmount || parseFloat(fromAmount) <= 0) {
-      setRoutes([]);
-      return;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 500));
-
-    const mockRoutes: SwapRoute[] = [
-      {
-        dex: 'Uniswap V3',
-        icon: '🦄',
-        outputAmount: (parseFloat(fromAmount) * 8000).toFixed(2),
-        priceImpact: 0.15,
-        gasEstimate: '0.003',
-        path: [fromToken!.symbol, toToken!.symbol],
-      },
-      {
-        dex: 'SushiSwap',
-        icon: '🍣',
-        outputAmount: (parseFloat(fromAmount) * 7950).toFixed(2),
-        priceImpact: 0.28,
-        gasEstimate: '0.0025',
-        path: [fromToken!.symbol, 'USDC', toToken!.symbol],
-      },
-      {
-        dex: 'Curve',
-        icon: '🌀',
-        outputAmount: (parseFloat(fromAmount) * 7980).toFixed(2),
-        priceImpact: 0.18,
-        gasEstimate: '0.0028',
-        path: [fromToken!.symbol, toToken!.symbol],
-      },
-    ];
-
-    setRoutes(mockRoutes);
-    setSelectedRoute(mockRoutes[0]);
-    setToAmount(mockRoutes[0].outputAmount);
   };
 
-  const handleSwap = async () => {
-    if (!fromToken || !toToken || !fromAmount || !selectedRoute) {
-      alert(t('fillAllFields'));
-      return;
-    }
-
-    if (parseFloat(fromAmount) > parseFloat(fromToken.balance || '0')) {
-      alert(t('insufficientBalance'));
-      return;
-    }
-
-    setSwapping(true);
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-
-    const newSwap: SwapHistory = {
-      id: Date.now().toString(),
-      fromToken: fromToken.symbol,
-      toToken: toToken.symbol,
-      fromAmount,
-      toAmount,
-      price: (parseFloat(toAmount) / parseFloat(fromAmount)).toFixed(4),
-      timestamp: Date.now(),
-      txHash: `0x${Math.random().toString(16).slice(2, 66)}`,
-      status: 'completed',
-    };
-
-    setHistory([newSwap, ...history]);
-    setSwapping(false);
-    setFromAmount('');
-    setToAmount('');
-  };
-
-  const handleTokenSwitch = () => {
+  const handleSwapTokens = () => {
     const temp = fromToken;
     setFromToken(toToken);
     setToToken(temp);
+    const tempAmount = fromAmount;
     setFromAmount(toAmount);
-    setToAmount('');
+    setToAmount(tempAmount);
   };
 
-  const getStatusColor = (status: string) => {
-    const colors = {
-      completed: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400',
-      pending: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400',
-      failed: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
-    };
-    return colors[status as keyof typeof colors] || colors.pending;
+  const handleSwap = async () => {
+    if (!fromAmount || parseFloat(fromAmount) <= 0) {
+      alert('Please enter a valid amount.');
+      return;
+    }
+    if (!isConnected) {
+      alert('Please connect your wallet to swap tokens.');
+      return;
+    }
+
+    const from = availableTokens.find(t => t.symbol === fromToken);
+    if (!from || parseFloat(fromAmount) > parseFloat(from.balance)) {
+      alert('Insufficient balance.');
+      return;
+    }
+
+    setIsSwapping(true);
+    console.log(`Swapping ${fromAmount} ${fromToken} for ${toAmount} ${toToken}...`);
+
+    try {
+      // In a real application, this would involve:
+      // 1. Approve token spending (if not native token)
+      // 2. Call swap contract (Uniswap, 1inch, etc.)
+      // 3. Wait for transaction confirmation
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      const swap: SwapTransaction = {
+        id: `swap_${Date.now()}`,
+        fromToken,
+        toToken,
+        fromAmount,
+        toAmount,
+        rate: exchangeRate,
+        timestamp: new Date().toISOString(),
+        status: 'completed',
+        txHash: `0x${Math.random().toString(36).substring(2, 15)}...`,
+      };
+
+      setSwapHistory(prev => [swap, ...prev]);
+      setFromAmount('');
+      setToAmount('');
+      alert(`Successfully swapped ${fromAmount} ${fromToken} for ${toAmount} ${toToken}!`);
+    } catch (error) {
+      console.error('Swap failed:', error);
+      alert('Swap failed. Please try again.');
+    } finally {
+      setIsSwapping(false);
+    }
+  };
+
+  const getTokenBalance = (symbol: string) => {
+    const token = availableTokens.find(t => t.symbol === symbol);
+    return token?.balance || '0';
   };
 
   if (!isConnected) {
     return (
-      <div className="text-center py-12">
-        <svg
-          className="w-16 h-16 mx-auto mb-4 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-          />
-        </svg>
-        <p className="text-gray-600 dark:text-gray-400">{t('connectWalletToSwap')}</p>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
+      <Alert className="bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Wallet Not Connected</AlertTitle>
+        <AlertDescription>Connect your wallet to swap tokens.</AlertDescription>
+      </Alert>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('tokenSwap')}</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {t('swapTokensAtBestRates')}
-          </p>
-        </div>
-        <button
-          onClick={() => setShowSettings(!showSettings)}
-          className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
-        >
-          ⚙️
-        </button>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-bold flex items-center">
+          <ArrowDownUp className="h-8 w-8 mr-3 text-primary" /> Token Swap
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Swap tokens instantly with the best rates
+        </p>
       </div>
 
-      {/* Settings */}
-      {showSettings && (
-        <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700">
-          <h3 className="font-semibold text-gray-900 dark:text-white mb-3">{t('swapSettings')}</h3>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              {t('slippageTolerance')} (%)
-            </label>
-            <div className="flex gap-2">
-              {['0.1', '0.5', '1.0'].map((value) => (
-                <button
-                  key={value}
-                  onClick={() => setSlippage(value)}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium ${
-                    slippage === value
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
-                  }`}
-                >
-                  {value}%
-                </button>
-              ))}
-              <input
-                type="number"
-                step="0.1"
-                value={slippage}
-                onChange={(e) => setSlippage(e.target.value)}
-                className="w-20 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Swap Interface */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-xl border border-gray-200 dark:border-gray-700">
-        {/* From Token */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            {t('from')}
-          </label>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowTokenSelector('from')}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
-            >
-              <span className="text-2xl">{fromToken?.logoURI}</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{fromToken?.symbol}</span>
-              <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            <input
-              type="number"
-              step="0.01"
-              value={fromAmount}
-              onChange={(e) => setFromAmount(e.target.value)}
-              placeholder="0.0"
-              className="flex-1 px-4 py-2 text-2xl border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-            />
-          </div>
-          {fromToken && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {t('balance')}: {parseFloat(fromToken.balance || '0').toFixed(4)} {fromToken.symbol}
-            </p>
-          )}
-        </div>
-
-        {/* Switch Button */}
-        <div className="flex justify-center my-4">
-          <button
-            onClick={handleTokenSwitch}
-            className="p-3 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-transform hover:rotate-180"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
-            </svg>
-          </button>
-        </div>
-
-        {/* To Token */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            {t('to')}
-          </label>
-          <div className="flex gap-3">
-            <button
-              onClick={() => setShowTokenSelector('to')}
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600"
-            >
-              <span className="text-2xl">{toToken?.logoURI}</span>
-              <span className="font-semibold text-gray-900 dark:text-white">{toToken?.symbol}</span>
-              <svg className="w-4 h-4 text-gray-600 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-            <input
-              type="text"
-              value={toAmount}
-              readOnly
-              placeholder="0.0"
-              className="flex-1 px-4 py-2 text-2xl border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white"
-            />
-          </div>
-          {toToken && fromAmount && toAmount && (
-            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              1 {fromToken?.symbol} ≈ {(parseFloat(toAmount) / parseFloat(fromAmount)).toFixed(4)} {toToken.symbol}
-            </p>
-          )}
-        </div>
-
-        {/* Routes */}
-        {routes.length > 0 && (
-          <div className="mb-6">
-            <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              {t('bestRoutes')}
-            </h3>
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Swap Interface */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Swap Tokens</CardTitle>
+            <CardDescription>Exchange one token for another</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* From Token */}
             <div className="space-y-2">
-              {routes.map((route, index) => (
-                <div
-                  key={index}
-                  onClick={() => {
-                    setSelectedRoute(route);
-                    setToAmount(route.outputAmount);
-                  }}
-                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all ${
-                    selectedRoute?.dex === route.dex
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-blue-300'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{route.icon}</span>
-                      <span className="font-semibold text-gray-900 dark:text-white">{route.dex}</span>
-                    </div>
-                    <span className="font-bold text-gray-900 dark:text-white">
-                      {route.outputAmount} {toToken?.symbol}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
-                    <span>{t('priceImpact')}: {route.priceImpact}%</span>
-                    <span>{t('gas')}: ~{route.gasEstimate} ETH</span>
-                  </div>
-                  <div className="flex gap-1 mt-1">
-                    {route.path.map((token, idx) => (
-                      <React.Fragment key={idx}>
-                        <span className="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-0.5 rounded">
-                          {token}
-                        </span>
-                        {idx < route.path.length - 1 && <span className="text-xs">→</span>}
-                      </React.Fragment>
+              <Label>From</Label>
+              <div className="flex gap-2">
+                <Select value={fromToken} onValueChange={setFromToken}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTokens.map(token => (
+                      <SelectItem key={token.symbol} value={token.symbol}>
+                        {token.symbol}
+                      </SelectItem>
                     ))}
-                  </div>
+                  </SelectContent>
+                </Select>
+                <div className="flex-1 relative">
+                  <Input
+                    type="number"
+                    step="0.000001"
+                    placeholder="0.0"
+                    value={fromAmount}
+                    onChange={(e) => setFromAmount(e.target.value)}
+                    className="pr-20"
+                  />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-2 top-1/2 -translate-y-1/2"
+                    onClick={() => setFromAmount(getTokenBalance(fromToken))}
+                  >
+                    MAX
+                  </Button>
                 </div>
-              ))}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Balance: {getTokenBalance(fromToken)} {fromToken}
+              </p>
             </div>
-          </div>
-        )}
 
-        {/* Swap Button */}
-        <button
-          onClick={handleSwap}
-          disabled={swapping || !fromAmount || !toAmount || parseFloat(fromAmount) <= 0}
-          className="w-full px-6 py-4 bg-gradient-to-r from-blue-500 to-purple-500 text-white rounded-xl font-bold text-lg hover:from-blue-600 hover:to-purple-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          {swapping ? (
-            <>
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-              {t('swapping')}...
-            </>
-          ) : (
-            <>
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-              </svg>
-              {t('swap')}
-            </>
-          )}
-        </button>
+            {/* Swap Button */}
+            <div className="flex justify-center">
+              <Button
+                variant="outline"
+                size="icon"
+                className="rounded-full"
+                onClick={handleSwapTokens}
+              >
+                <ArrowDownUp className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* To Token */}
+            <div className="space-y-2">
+              <Label>To</Label>
+              <div className="flex gap-2">
+                <Select value={toToken} onValueChange={setToToken}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableTokens.filter(t => t.symbol !== fromToken).map(token => (
+                      <SelectItem key={token.symbol} value={token.symbol}>
+                        {token.symbol}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  step="0.000001"
+                  placeholder="0.0"
+                  value={toAmount}
+                  readOnly
+                  className="flex-1"
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Balance: {getTokenBalance(toToken)} {toToken}
+              </p>
+            </div>
+
+            {/* Swap Details */}
+            {fromAmount && parseFloat(fromAmount) > 0 && (
+              <div className="p-4 bg-muted rounded-lg space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Exchange Rate</span>
+                  <span className="font-medium">
+                    1 {fromToken} = {exchangeRate.toFixed(6)} {toToken}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Price Impact</span>
+                  <span className={priceImpact > 0.5 ? 'text-red-600 font-medium' : 'font-medium'}>
+                    {priceImpact.toFixed(2)}%
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Slippage Tolerance</span>
+                  <span className="font-medium">{slippage}%</span>
+                </div>
+                {priceImpact > 0.5 && (
+                  <Alert variant="destructive" className="mt-2">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription>
+                      High price impact. Consider splitting your swap into smaller amounts.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            )}
+          </CardContent>
+          <CardFooter>
+            <Button
+              className="w-full"
+              onClick={handleSwap}
+              disabled={isSwapping || !fromAmount || parseFloat(fromAmount) <= 0}
+            >
+              {isSwapping ? (
+                <>
+                  <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  Swapping...
+                </>
+              ) : (
+                <>
+                  <ArrowDownUp className="h-4 w-4 mr-2" />
+                  Swap
+                </>
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
+
+        {/* Settings & Info */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Swap Settings</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="slippage">Slippage Tolerance (%)</Label>
+                <Input
+                  id="slippage"
+                  type="number"
+                  step="0.1"
+                  value={slippage}
+                  onChange={(e) => setSlippage(e.target.value)}
+                />
+                <div className="flex gap-2">
+                  {['0.1', '0.5', '1.0'].map(value => (
+                    <Button
+                      key={value}
+                      variant={slippage === value ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setSlippage(value)}
+                    >
+                      {value}%
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertTitle>About Token Swaps</AlertTitle>
+            <AlertDescription>
+              Swaps are executed using decentralized exchanges. Rates are calculated in real-time and may vary based on liquidity.
+            </AlertDescription>
+          </Alert>
+        </div>
       </div>
 
-      {/* History */}
-      {history.length > 0 && (
-        <div className="space-y-3">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('recentSwaps')}</h3>
-          {history.map((swap) => (
-            <div
-              key={swap.id}
-              className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-200 dark:border-gray-700"
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900 dark:text-white">
-                    {swap.fromAmount} {swap.fromToken}
-                  </span>
-                  <span className="text-gray-500">→</span>
-                  <span className="font-semibold text-gray-900 dark:text-white">
-                    {swap.toAmount} {swap.toToken}
-                  </span>
-                </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(swap.status)}`}>
-                  {swap.status}
-                </span>
-              </div>
-              <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
-                <span>{new Date(swap.timestamp).toLocaleString()}</span>
-                <span className="font-mono text-xs">{swap.txHash}</span>
-              </div>
+      {/* Swap History */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Swap History</CardTitle>
+          <CardDescription>Your recent token swaps</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {swapHistory.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              <ArrowDownUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No swap history yet.</p>
             </div>
-          ))}
-        </div>
-      )}
-
-      {/* Token Selector Modal */}
-      {showTokenSelector && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-900 dark:text-white">{t('selectToken')}</h3>
-              <button
-                onClick={() => setShowTokenSelector(null)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              {tokens.map((token) => (
+          ) : (
+            <div className="space-y-3">
+              {swapHistory.map(swap => (
                 <div
-                  key={token.address}
-                  onClick={() => {
-                    if (showTokenSelector === 'from') {
-                      setFromToken(token);
-                    } else {
-                      setToToken(token);
-                    }
-                    setShowTokenSelector(null);
-                  }}
-                  className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                  key={swap.id}
+                  className="flex items-center justify-between p-4 border rounded-lg"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-3xl">{token.logoURI}</span>
+                  <div className="flex items-center gap-4">
+                    <div className="p-2 bg-muted rounded-lg">
+                      <ArrowDownUp className="h-5 w-5" />
+                    </div>
                     <div>
-                      <p className="font-semibold text-gray-900 dark:text-white">{token.symbol}</p>
-                      <p className="text-xs text-gray-600 dark:text-gray-400">{token.name}</p>
+                      <p className="font-semibold">
+                        {swap.fromAmount} {swap.fromToken} → {swap.toAmount} {swap.toToken}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {format(parseISO(swap.timestamp), 'PPp')}
+                      </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-medium text-gray-900 dark:text-white">
-                      {parseFloat(token.balance || '0').toFixed(4)}
-                    </p>
-                    {token.price && (
-                      <p className="text-xs text-gray-600 dark:text-gray-400">
-                        ${token.price.toLocaleString()}
-                      </p>
+                  <div className="flex items-center gap-3">
+                    {swap.status === 'completed' ? (
+                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Completed
+                      </Badge>
+                    ) : swap.status === 'pending' ? (
+                      <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300">
+                        Pending
+                      </Badge>
+                    ) : (
+                      <Badge variant="destructive">Failed</Badge>
                     )}
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        </div>
-      )}
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
-}
+};
 
+export default TokenSwap;
