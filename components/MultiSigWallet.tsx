@@ -1,534 +1,614 @@
-'use client';
-
 import React, { useState, useEffect } from 'react';
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { useTranslation } from '@/lib/i18n';
-import { formatEther, parseEther } from 'viem';
+import { useAccount } from 'wagmi';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Badge } from './ui/badge';
+import { Progress } from './ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Shield, Users, CheckCircle, XCircle, Clock, PlusCircle, Send, Info, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { Separator } from './ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from './ui/dialog';
+import { format, parseISO } from 'date-fns';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 
 interface Signer {
+  id: string;
   address: string;
-  name?: string;
+  username?: string;
   avatar?: string;
-  hasSigned: boolean;
+  weight: number;
+  addedAt: string;
+  status: 'active' | 'pending' | 'removed';
 }
 
 interface Transaction {
   id: string;
   to: string;
-  value: string;
-  data?: string;
+  amount: string;
+  token: string;
   description: string;
-  signers: Signer[];
+  status: 'pending' | 'approved' | 'rejected' | 'executed';
   requiredSignatures: number;
   currentSignatures: number;
-  status: 'pending' | 'executed' | 'cancelled';
-  createdAt: number;
-  executedAt?: number;
-  createdBy: string;
+  signers: {
+    address: string;
+    signed: boolean;
+    signedAt?: string;
+  }[];
+  createdAt: string;
+  executedAt?: string;
 }
 
-interface MultiSigWalletInfo {
+interface MultiSigWallet {
+  id: string;
+  name: string;
   address: string;
+  threshold: number; // Minimum signatures required
+  totalSigners: number;
   balance: string;
   signers: Signer[];
-  threshold: number;
-  transactionCount: number;
+  transactions: Transaction[];
 }
 
-export default function MultiSigWallet() {
-  const { address, isConnected } = useAccount();
-  const { t } = useTranslation();
-  const [walletInfo, setWalletInfo] = useState<MultiSigWalletInfo | null>(null);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showTransactionModal, setShowTransactionModal] = useState(false);
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
-  const [activeTab, setActiveTab] = useState<'pending' | 'executed' | 'all'>('pending');
+const mockMultiSigWallet: MultiSigWallet = {
+  id: 'multisig_001',
+  name: 'Team Treasury',
+  address: '0xMultiSig123...',
+  threshold: 2,
+  totalSigners: 3,
+  balance: '5.5',
+  signers: [
+    {
+      id: 'signer_001',
+      address: '0xYou',
+      username: 'You',
+      weight: 1,
+      addedAt: '2024-07-01T10:00:00Z',
+      status: 'active',
+    },
+    {
+      id: 'signer_002',
+      address: '0xAlice',
+      username: 'Alice',
+      avatar: 'https://picsum.photos/seed/alice/100/100',
+      weight: 1,
+      addedAt: '2024-07-05T14:30:00Z',
+      status: 'active',
+    },
+    {
+      id: 'signer_003',
+      address: '0xBob',
+      username: 'Bob',
+      avatar: 'https://picsum.photos/seed/bob/100/100',
+      weight: 1,
+      addedAt: '2024-07-10T09:00:00Z',
+      status: 'active',
+    },
+  ],
+  transactions: [
+    {
+      id: 'tx_001',
+      to: '0xRecipient',
+      amount: '1.0',
+      token: 'ETH',
+      description: 'Payment for development services',
+      status: 'approved',
+      requiredSignatures: 2,
+      currentSignatures: 2,
+      signers: [
+        { address: '0xYou', signed: true, signedAt: '2024-07-22T10:00:00Z' },
+        { address: '0xAlice', signed: true, signedAt: '2024-07-22T11:00:00Z' },
+        { address: '0xBob', signed: false },
+      ],
+      createdAt: '2024-07-22T09:00:00Z',
+      executedAt: '2024-07-22T11:30:00Z',
+    },
+    {
+      id: 'tx_002',
+      to: '0xAnother',
+      amount: '0.5',
+      token: 'ETH',
+      description: 'Community grant payment',
+      status: 'pending',
+      requiredSignatures: 2,
+      currentSignatures: 1,
+      signers: [
+        { address: '0xYou', signed: true, signedAt: '2024-07-22T15:00:00Z' },
+        { address: '0xAlice', signed: false },
+        { address: '0xBob', signed: false },
+      ],
+      createdAt: '2024-07-22T14:30:00Z',
+    },
+  ],
+};
 
-  // Create transaction form state
-  const [newTx, setNewTx] = useState({
+const MultiSigWallet: React.FC = () => {
+  const { address, isConnected } = useAccount();
+  const [wallet, setWallet] = useState<MultiSigWallet>(mockMultiSigWallet);
+  const [isCreateTxModalOpen, setIsCreateTxModalOpen] = useState(false);
+  const [isAddSignerModalOpen, setIsAddSignerModalOpen] = useState(false);
+  const [newTransaction, setNewTransaction] = useState({
     to: '',
-    value: '',
+    amount: '',
+    token: 'ETH',
     description: '',
-    data: '',
+  });
+  const [newSigner, setNewSigner] = useState({
+    address: '',
+    weight: '1',
   });
 
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
-
   useEffect(() => {
-    const loadWalletData = async () => {
-      if (!address) return;
-
-      setLoading(true);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock data
-      const mockWalletInfo: MultiSigWalletInfo = {
-        address: '0x1234567890123456789012345678901234567890',
-        balance: '5.5',
-        signers: [
-          {
-            address: address,
-            name: 'You',
-            hasSigned: false,
-          },
-          {
-            address: '0x9876543210987654321098765432109876543210',
-            name: 'Alice',
-            hasSigned: false,
-          },
-          {
-            address: '0xabcdefabcdefabcdefabcdefabcdefabcdefabcd',
-            name: 'Bob',
-            hasSigned: false,
-          },
-        ],
-        threshold: 2,
-        transactionCount: 5,
-      };
-
-      const mockTransactions: Transaction[] = [
-        {
-          id: '1',
-          to: '0x1111111111111111111111111111111111111111',
-          value: '1.5',
-          description: 'Payment to contractor',
-          signers: [
-            { ...mockWalletInfo.signers[0], hasSigned: true },
-            { ...mockWalletInfo.signers[1], hasSigned: false },
-            { ...mockWalletInfo.signers[2], hasSigned: false },
-          ],
-          requiredSignatures: 2,
-          currentSignatures: 1,
-          status: 'pending',
-          createdAt: Date.now() - 3600000,
-          createdBy: address,
-        },
-        {
-          id: '2',
-          to: '0x2222222222222222222222222222222222222222',
-          value: '0.5',
-          description: 'Monthly subscription',
-          signers: [
-            { ...mockWalletInfo.signers[0], hasSigned: true },
-            { ...mockWalletInfo.signers[1], hasSigned: true },
-            { ...mockWalletInfo.signers[2], hasSigned: false },
-          ],
-          requiredSignatures: 2,
-          currentSignatures: 2,
-          status: 'pending',
-          createdAt: Date.now() - 7200000,
-          createdBy: mockWalletInfo.signers[1].address,
-        },
-        {
-          id: '3',
-          to: '0x3333333333333333333333333333333333333333',
-          value: '2.0',
-          description: 'Marketing budget',
-          signers: [
-            { ...mockWalletInfo.signers[0], hasSigned: true },
-            { ...mockWalletInfo.signers[1], hasSigned: true },
-            { ...mockWalletInfo.signers[2], hasSigned: true },
-          ],
-          requiredSignatures: 2,
-          currentSignatures: 3,
-          status: 'executed',
-          createdAt: Date.now() - 86400000,
-          executedAt: Date.now() - 82800000,
-          createdBy: mockWalletInfo.signers[2].address,
-        },
-      ];
-
-      setWalletInfo(mockWalletInfo);
-      setTransactions(mockTransactions);
-      setLoading(false);
-    };
-
-    loadWalletData();
-  }, [address]);
-
-  const handleSignTransaction = async (txId: string) => {
-    // In production, call the smart contract's sign function
-    setTransactions((prev) =>
-      prev.map((tx) => {
-        if (tx.id === txId) {
-          const updatedSigners = tx.signers.map((signer) =>
-            signer.address.toLowerCase() === address?.toLowerCase()
-              ? { ...signer, hasSigned: true }
-              : signer
-          );
-          return {
-            ...tx,
-            signers: updatedSigners,
-            currentSignatures: updatedSigners.filter((s) => s.hasSigned).length,
-          };
-        }
-        return tx;
-      })
-    );
-  };
-
-  const handleExecuteTransaction = async (txId: string) => {
-    const tx = transactions.find((t) => t.id === txId);
-    if (!tx || tx.currentSignatures < tx.requiredSignatures) {
-      alert(t('notEnoughSignatures'));
-      return;
+    if (isConnected && address) {
+      fetchMultiSigWallet(address);
     }
+  }, [address, isConnected]);
 
-    // In production, call the smart contract's execute function
-    setTransactions((prev) =>
-      prev.map((t) =>
-        t.id === txId
-          ? { ...t, status: 'executed' as const, executedAt: Date.now() }
-          : t
-      )
-    );
+  const fetchMultiSigWallet = async (userAddress: string) => {
+    // In a real application, this would fetch from smart contract
+    console.log(`Fetching multi-sig wallet for ${userAddress}...`);
+    await new Promise(resolve => setTimeout(resolve, 1000));
   };
 
   const handleCreateTransaction = async () => {
-    if (!newTx.to || !newTx.value || !newTx.description) {
-      alert(t('pleaseFillAllFields'));
+    if (!newTransaction.to || !newTransaction.amount) {
+      alert('Please fill in all required fields.');
+      return;
+    }
+    if (!isConnected) {
+      alert('Please connect your wallet.');
       return;
     }
 
-    const transaction: Transaction = {
-      id: Date.now().toString(),
-      to: newTx.to,
-      value: newTx.value,
-      data: newTx.data,
-      description: newTx.description,
-      signers: walletInfo!.signers.map((s) => ({ ...s, hasSigned: false })),
-      requiredSignatures: walletInfo!.threshold,
-      currentSignatures: 0,
+    console.log('Creating transaction:', newTransaction);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    const tx: Transaction = {
+      id: `tx_${Date.now()}`,
+      to: newTransaction.to,
+      amount: newTransaction.amount,
+      token: newTransaction.token,
+      description: newTransaction.description,
       status: 'pending',
-      createdAt: Date.now(),
-      createdBy: address!,
+      requiredSignatures: wallet.threshold,
+      currentSignatures: 0,
+      signers: wallet.signers.map(s => ({
+        address: s.address,
+        signed: false,
+      })),
+      createdAt: new Date().toISOString(),
     };
 
-    setTransactions([transaction, ...transactions]);
-    setShowCreateModal(false);
-    setNewTx({ to: '', value: '', description: '', data: '' });
+    setWallet(prev => ({
+      ...prev,
+      transactions: [tx, ...prev.transactions],
+    }));
+    setIsCreateTxModalOpen(false);
+    setNewTransaction({ to: '', amount: '', token: 'ETH', description: '' });
+    alert('Transaction created! Waiting for signatures.');
   };
 
-  const filteredTransactions = transactions.filter((tx) => {
-    if (activeTab === 'pending') return tx.status === 'pending';
-    if (activeTab === 'executed') return tx.status === 'executed';
-    return true;
-  });
+  const handleSignTransaction = async (txId: string) => {
+    if (!isConnected) {
+      alert('Please connect your wallet to sign.');
+      return;
+    }
+
+    console.log(`Signing transaction ${txId}...`);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    setWallet(prev => ({
+      ...prev,
+      transactions: prev.transactions.map(tx => {
+        if (tx.id === txId) {
+          const updatedSigners = tx.signers.map(s => 
+            s.address === address ? { ...s, signed: true, signedAt: new Date().toISOString() } : s
+          );
+          const currentSignatures = updatedSigners.filter(s => s.signed).length;
+          const status = currentSignatures >= tx.requiredSignatures ? 'approved' : 'pending';
+          
+          return {
+            ...tx,
+            signers: updatedSigners,
+            currentSignatures,
+            status,
+          };
+        }
+        return tx;
+      }),
+    }));
+
+    alert('Transaction signed successfully!');
+  };
+
+  const handleExecuteTransaction = async (txId: string) => {
+    console.log(`Executing transaction ${txId}...`);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    setWallet(prev => ({
+      ...prev,
+      transactions: prev.transactions.map(tx => 
+        tx.id === txId 
+          ? { ...tx, status: 'executed' as Transaction['status'], executedAt: new Date().toISOString() }
+          : tx
+      ),
+    }));
+
+    alert('Transaction executed successfully!');
+  };
+
+  const handleAddSigner = async () => {
+    if (!newSigner.address) {
+      alert('Please enter a signer address.');
+      return;
+    }
+    if (!isConnected) {
+      alert('Please connect your wallet.');
+      return;
+    }
+
+    console.log('Adding signer:', newSigner);
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    const signer: Signer = {
+      id: `signer_${Date.now()}`,
+      address: newSigner.address,
+      weight: parseInt(newSigner.weight),
+      addedAt: new Date().toISOString(),
+      status: 'active',
+    };
+
+    setWallet(prev => ({
+      ...prev,
+      signers: [...prev.signers, signer],
+      totalSigners: prev.totalSigners + 1,
+    }));
+    setIsAddSignerModalOpen(false);
+    setNewSigner({ address: '', weight: '1' });
+    alert('Signer added successfully!');
+  };
+
+  const getStatusBadge = (status: Transaction['status']) => {
+    switch (status) {
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+      case 'approved':
+        return <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
+      case 'executed':
+        return <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300">Executed</Badge>;
+      case 'rejected':
+        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+      default:
+        return null;
+    }
+  };
 
   if (!isConnected) {
     return (
-      <div className="text-center py-12">
-        <svg
-          className="w-16 h-16 mx-auto mb-4 text-gray-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
-          />
-        </svg>
-        <p className="text-gray-600 dark:text-gray-400">{t('connectWalletToAccess')}</p>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    );
-  }
-
-  if (!walletInfo) {
-    return (
-      <div className="text-center py-12">
-        <p className="text-gray-600 dark:text-gray-400">{t('noMultiSigWallet')}</p>
-      </div>
+      <Alert className="bg-yellow-50 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300">
+        <Info className="h-4 w-4" />
+        <AlertTitle>Wallet Not Connected</AlertTitle>
+        <AlertDescription>Connect your wallet to manage multi-signature wallets.</AlertDescription>
+      </Alert>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Wallet Overview */}
-      <div className="bg-gradient-to-br from-purple-500 to-indigo-600 rounded-2xl p-8 text-white shadow-xl">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">{t('multiSigWallet')}</h2>
-            <p className="text-purple-100 text-sm font-mono">{walletInfo.address.slice(0, 20)}...</p>
-          </div>
-          <div className="px-3 py-1 bg-white/20 backdrop-blur-sm rounded-full text-sm font-medium">
-            {walletInfo.threshold}/{walletInfo.signers.length} {t('signaturesRequired')}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4">
-            <p className="text-sm text-purple-100 mb-1">{t('balance')}</p>
-            <p className="text-3xl font-bold">{walletInfo.balance} ETH</p>
-          </div>
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4">
-            <p className="text-sm text-purple-100 mb-1">{t('signers')}</p>
-            <p className="text-3xl font-bold">{walletInfo.signers.length}</p>
-          </div>
-          <div className="bg-white/20 backdrop-blur-sm rounded-xl p-4">
-            <p className="text-sm text-purple-100 mb-1">{t('totalTransactions')}</p>
-            <p className="text-3xl font-bold">{walletInfo.transactionCount}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Signers List */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">{t('signers')}</h3>
-        <div className="space-y-3">
-          {walletInfo.signers.map((signer, index) => (
-            <div
-              key={signer.address}
-              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
-                  {signer.name?.[0] || index + 1}
-                </div>
-                <div>
-                  <p className="font-medium text-gray-900 dark:text-white">
-                    {signer.name || `Signer ${index + 1}`}
-                  </p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">
-                    {signer.address.slice(0, 10)}...{signer.address.slice(-8)}
-                  </p>
-                </div>
-              </div>
-              {signer.address.toLowerCase() === address.toLowerCase() && (
-                <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-xs rounded">
-                  {t('you')}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Header with Tabs */}
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <div className="flex gap-4">
-          {(['pending', 'executed', 'all'] as const).map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors capitalize ${
-                activeTab === tab
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
-              }`}
-            >
-              {t(tab)}
-              <span className="ml-2 px-2 py-0.5 bg-white/20 rounded text-xs">
-                {tab === 'pending'
-                  ? transactions.filter((tx) => tx.status === 'pending').length
-                  : tab === 'executed'
-                  ? transactions.filter((tx) => tx.status === 'executed').length
-                  : transactions.length}
-              </span>
-            </button>
-          ))}
+        <div>
+          <h1 className="text-3xl font-bold flex items-center">
+            <Shield className="h-8 w-8 mr-3 text-primary" /> Multi-Signature Wallet
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Secure wallet requiring multiple signatures for transactions
+          </p>
         </div>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium flex items-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          {t('newTransaction')}
-        </button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setIsAddSignerModalOpen(true)}>
+            <PlusCircle className="h-4 w-4 mr-2" /> Add Signer
+          </Button>
+          <Button onClick={() => setIsCreateTxModalOpen(true)}>
+            <Send className="h-4 w-4 mr-2" /> New Transaction
+          </Button>
+        </div>
       </div>
 
-      {/* Transactions List */}
-      <div className="space-y-4">
-        {filteredTransactions.length === 0 ? (
-          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700">
-            <svg
-              className="w-16 h-16 mx-auto mb-4 text-gray-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
-            <p className="text-gray-600 dark:text-gray-400">{t('noTransactions')}</p>
+      {/* Wallet Overview */}
+      <Card className="bg-gradient-to-br from-blue-500 to-purple-500 text-white">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-white mb-2">{wallet.name}</CardTitle>
+              <CardDescription className="text-white/80">
+                {wallet.address}
+              </CardDescription>
+            </div>
+            <Shield className="h-12 w-12 opacity-50" />
           </div>
-        ) : (
-          filteredTransactions.map((tx) => {
-            const canSign =
-              tx.status === 'pending' &&
-              !tx.signers.find((s) => s.address.toLowerCase() === address.toLowerCase())?.hasSigned;
-            const canExecute = tx.status === 'pending' && tx.currentSignatures >= tx.requiredSignatures;
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-sm opacity-80">Balance</p>
+              <p className="text-3xl font-bold">{wallet.balance} ETH</p>
+            </div>
+            <div>
+              <p className="text-sm opacity-80">Threshold</p>
+              <p className="text-3xl font-bold">{wallet.threshold} of {wallet.totalSigners}</p>
+            </div>
+            <div>
+              <p className="text-sm opacity-80">Signers</p>
+              <p className="text-3xl font-bold">{wallet.totalSigners}</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-            return (
-              <div
-                key={tx.id}
-                className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-200 dark:border-gray-700"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h4 className="font-bold text-gray-900 dark:text-white">{tx.description}</h4>
-                      <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          tx.status === 'pending'
-                            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400'
-                            : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                        }`}
-                      >
-                        {tx.status}
-                      </span>
-                    </div>
-                    <div className="space-y-1 text-sm text-gray-600 dark:text-gray-400">
-                      <p>
-                        {t('to')}: {tx.to.slice(0, 10)}...{tx.to.slice(-8)}
-                      </p>
-                      <p>
-                        {t('amount')}: <strong className="text-gray-900 dark:text-white">{tx.value} ETH</strong>
-                      </p>
-                      <p>{t('created')}: {new Date(tx.createdAt).toLocaleString()}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-                      {tx.currentSignatures}/{tx.requiredSignatures}
-                    </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">{t('signatures')}</p>
-                  </div>
-                </div>
+      <Tabs defaultValue="signers" className="w-full">
+        <TabsList>
+          <TabsTrigger value="signers">Signers ({wallet.signers.length})</TabsTrigger>
+          <TabsTrigger value="transactions">Transactions ({wallet.transactions.length})</TabsTrigger>
+        </TabsList>
 
-                {/* Signers */}
-                <div className="flex items-center gap-2 mb-4">
-                  {tx.signers.map((signer) => (
-                    <div
-                      key={signer.address}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                        signer.hasSigned
-                          ? 'bg-green-500 text-white'
-                          : 'bg-gray-200 dark:bg-gray-700 text-gray-400'
-                      }`}
-                      title={signer.name || signer.address}
-                    >
-                      {signer.hasSigned ? '✓' : '?'}
+        <TabsContent value="signers" className="space-y-4 mt-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Authorized Signers</CardTitle>
+              <CardDescription>Addresses that can sign transactions</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {wallet.signers.map(signer => (
+                  <div
+                    key={signer.id}
+                    className="flex items-center justify-between p-4 border rounded-lg"
+                  >
+                    <div className="flex items-center gap-4">
+                      <Avatar>
+                        <AvatarImage src={signer.avatar} />
+                        <AvatarFallback>
+                          {signer.username?.[0] || signer.address.slice(2, 4).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <p className="font-semibold">
+                          {signer.username || signer.address.slice(0, 10) + '...'}
+                          {signer.address === address && (
+                            <Badge className="ml-2" variant="secondary">You</Badge>
+                          )}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Weight: {signer.weight} • Added {format(parseISO(signer.addedAt), 'PP')}
+                        </p>
+                      </div>
                     </div>
-                  ))}
-                </div>
-
-                {/* Actions */}
-                {tx.status === 'pending' && (
-                  <div className="flex gap-2">
-                    {canSign && (
-                      <button
-                        onClick={() => handleSignTransaction(tx.id)}
-                        className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 font-medium"
-                      >
-                        {t('sign')}
-                      </button>
-                    )}
-                    {canExecute && (
-                      <button
-                        onClick={() => handleExecuteTransaction(tx.id)}
-                        className="flex-1 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 font-medium"
-                      >
-                        {t('execute')}
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setSelectedTransaction(tx)}
-                      className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700"
-                    >
-                      {t('details')}
-                    </button>
+                    <Badge variant={signer.status === 'active' ? 'default' : 'secondary'}>
+                      {signer.status}
+                    </Badge>
                   </div>
-                )}
+                ))}
               </div>
-            );
-          })
-        )}
-      </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transactions" className="space-y-4 mt-6">
+          {wallet.transactions.length === 0 ? (
+            <Card>
+              <CardContent className="flex flex-col items-center justify-center h-64">
+                <Send className="h-16 w-16 text-muted-foreground mb-4" />
+                <p className="text-muted-foreground">No transactions yet.</p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {wallet.transactions.map(tx => {
+                const userSigned = tx.signers.find(s => s.address === address)?.signed || false;
+                const canExecute = tx.status === 'approved' && !tx.executedAt;
+                
+                return (
+                  <Card key={tx.id}>
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            {getStatusBadge(tx.status)}
+                          </div>
+                          <CardTitle className="text-lg">
+                            {tx.amount} {tx.token} → {tx.to.slice(0, 10)}...
+                          </CardTitle>
+                          <CardDescription>{tx.description}</CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-muted-foreground">Signatures</span>
+                          <span className="font-medium">
+                            {tx.currentSignatures} / {tx.requiredSignatures}
+                          </span>
+                        </div>
+                        <Progress value={(tx.currentSignatures / tx.requiredSignatures) * 100} />
+                      </div>
+                      <div className="space-y-2">
+                        <p className="text-sm font-medium">Signers:</p>
+                        {tx.signers.map((signer, idx) => {
+                          const signerInfo = wallet.signers.find(s => s.address === signer.address);
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-2 bg-muted rounded"
+                            >
+                              <div className="flex items-center gap-2">
+                                {signer.signed ? (
+                                  <CheckCircle className="h-4 w-4 text-green-600" />
+                                ) : (
+                                  <Clock className="h-4 w-4 text-yellow-600" />
+                                )}
+                                <span className="text-sm">
+                                  {signerInfo?.username || signer.address.slice(0, 10) + '...'}
+                                </span>
+                              </div>
+                              {signer.signed && signer.signedAt && (
+                                <span className="text-xs text-muted-foreground">
+                                  {format(parseISO(signer.signedAt), 'PPp')}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Created {format(parseISO(tx.createdAt), 'PPp')}
+                      </p>
+                    </CardContent>
+                    <CardFooter className="flex gap-2">
+                      {!userSigned && tx.status === 'pending' && (
+                        <Button
+                          onClick={() => handleSignTransaction(tx.id)}
+                          className="flex-1"
+                        >
+                          <CheckCircle className="h-4 w-4 mr-2" /> Sign Transaction
+                        </Button>
+                      )}
+                      {canExecute && (
+                        <Button
+                          onClick={() => handleExecuteTransaction(tx.id)}
+                          variant="default"
+                          className="flex-1"
+                        >
+                          <Send className="h-4 w-4 mr-2" /> Execute
+                        </Button>
+                      )}
+                      {userSigned && tx.status === 'pending' && (
+                        <Badge className="bg-green-500">
+                          <CheckCircle className="h-3 w-3 mr-1" /> You signed
+                        </Badge>
+                      )}
+                    </CardFooter>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
 
       {/* Create Transaction Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md p-6">
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-              {t('createTransaction')}
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('recipientAddress')}
-                </label>
-                <input
-                  type="text"
-                  value={newTx.to}
-                  onChange={(e) => setNewTx({ ...newTx, to: e.target.value })}
-                  placeholder="0x..."
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('amount')} (ETH)
-                </label>
-                <input
+      <Dialog open={isCreateTxModalOpen} onOpenChange={setIsCreateTxModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Create Transaction</DialogTitle>
+            <DialogDescription>Create a new transaction requiring signatures</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="to">To Address *</Label>
+              <Input
+                id="to"
+                placeholder="0x..."
+                value={newTransaction.to}
+                onChange={(e) => setNewTransaction(prev => ({ ...prev, to: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="amount">Amount *</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="amount"
                   type="number"
-                  step="0.01"
-                  value={newTx.value}
-                  onChange={(e) => setNewTx({ ...newTx, value: e.target.value })}
+                  step="0.000001"
                   placeholder="0.0"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  value={newTransaction.amount}
+                  onChange={(e) => setNewTransaction(prev => ({ ...prev, amount: e.target.value }))}
+                  className="flex-1"
                 />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('description')}
-                </label>
-                <input
-                  type="text"
-                  value={newTx.description}
-                  onChange={(e) => setNewTx({ ...newTx, description: e.target.value })}
-                  placeholder={t('whatIsThisFor')}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
-                />
+                <Select
+                  value={newTransaction.token}
+                  onValueChange={(value) => setNewTransaction(prev => ({ ...prev, token: value }))}
+                >
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ETH">ETH</SelectItem>
+                    <SelectItem value="USDC">USDC</SelectItem>
+                    <SelectItem value="NOTE">NOTE</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-              >
-                {t('cancel')}
-              </button>
-              <button
-                onClick={handleCreateTransaction}
-                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
-              >
-                {t('create')}
-              </button>
+            <div className="space-y-2">
+              <Label htmlFor="description">Description</Label>
+              <Input
+                id="description"
+                placeholder="Transaction purpose..."
+                value={newTransaction.description}
+                onChange={(e) => setNewTransaction(prev => ({ ...prev, description: e.target.value }))}
+              />
             </div>
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                This transaction will require {wallet.threshold} signatures to be executed.
+              </AlertDescription>
+            </Alert>
           </div>
-        </div>
-      )}
+          <DialogFooter>
+            <Button onClick={handleCreateTransaction}>Create Transaction</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Signer Modal */}
+      <Dialog open={isAddSignerModalOpen} onOpenChange={setIsAddSignerModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Add Signer</DialogTitle>
+            <DialogDescription>Add a new authorized signer to the wallet</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="signerAddress">Signer Address *</Label>
+              <Input
+                id="signerAddress"
+                placeholder="0x..."
+                value={newSigner.address}
+                onChange={(e) => setNewSigner(prev => ({ ...prev, address: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="weight">Voting Weight</Label>
+              <Input
+                id="weight"
+                type="number"
+                min="1"
+                value={newSigner.weight}
+                onChange={(e) => setNewSigner(prev => ({ ...prev, weight: e.target.value }))}
+              />
+              <p className="text-xs text-muted-foreground">
+                Higher weight means more influence in multi-sig decisions
+              </p>
+            </div>
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Adding a signer requires approval from existing signers. This is a sensitive operation.
+              </AlertDescription>
+            </Alert>
+          </div>
+          <DialogFooter>
+            <Button onClick={handleAddSigner}>Add Signer</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
-}
+};
 
+export default MultiSigWallet;
